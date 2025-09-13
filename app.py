@@ -6,7 +6,7 @@ app = Flask(__name__)
 datos_guardados = []
 
 # Endpoint para recibir datos desde el puente MQTT
-@app.route('/api/datos', methods=['POST'])
+@app.route('/datos', methods=['POST'])
 def recibir_datos():
     data = request.json
     if data:
