@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Datos Recibidos</title>
+        <meta http-equiv="refresh" content="5"> <!-- refresca cada 5s -->
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            table { border-collapse: collapse; width: 60%; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+            th { background-color: #f2f2f2; }
+        </style>
+    </head>
+    <body>
+        <h2>📊 Datos Recibidos</h2>
+        <table>
+            <tr>
+                <th>Nodo</th>
+                <th>Temperatura (°C)</th>
+                <th>Humedad (%)</th>
+            </tr>
+            {% for d in datos %}
+            <tr>
+                <td>{{ d['nodo'] }}</td>
+                <td>{{ d['temp'] }}</td>
+                <td>{{ d['hum'] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </body>
+    </html>
