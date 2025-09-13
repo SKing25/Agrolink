@@ -19,3 +19,6 @@ def recibir_datos():
 @app.route("/ver", methods=["GET"])
 def ver_datos():
     return render_template_string('dht22.html', datos=datos_recibidos)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
