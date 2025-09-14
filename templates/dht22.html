@@ -1,30 +1,44 @@
 <!DOCTYPE html>
-    <html>
+<html>
 <head>
-    <title>Datos ESP32</title>
-    <meta http-equiv="refresh" content="5"> <!-- refresca cada 5 seg -->
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 50%; }
-        th, td { border: 1px solid black; padding: 8px; text-align: center; }
-        th { background: #f2f2f2; }
-    </style>
+    <title>🌡️ Datos DHT22</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-    <h2>Datos recibidos desde ESP32</h2>
+    <h1>🌡️ Datos del Sensor DHT22</h1>
+    <p>📊 Total de registros: {{ datos|length }}</p>
+
     <table>
-        <tr>
-            <th>#</th>
-            <th>Temperatura</th>
-            <th>Humedad</th>
-        </tr>
-        {% for d in datos %}
-        <tr>
-            <td>{{ loop.index }}</td>   <!-- loop.index empieza en 1 -->
-            <td>{{ d.temp }}</td>
-            <td>{{ d.hum }}</td>
-        </tr>
-        {% endfor %}
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>🌡️ Temperatura (°C)</th>
+                <th>💧 Humedad (%)</th>
+                <th>📍 Nodo</th>
+                <th>🕒 Fecha</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dato in datos %}
+            <tr>
+                <td>{{ dato.id }}</td>
+                <td class="temp">{{ "%.1f"|format(dato.temperatura) }}°C</td>
+                <td class="hum">{{ "%.1f"|format(dato.humedad) }}%</td>
+                <td>{{ dato.nodeId }}</td>
+                <td>{{ dato.fecha_creacion }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5">No hay datos disponibles</td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
+
+    <script>
+        // Auto-refresh cada 30 segundos
+        setTimeout(() => location.reload(), 30000);
+    </script>
 </body>
 </html>
