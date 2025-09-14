@@ -1,22 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>🌡️ Datos DHT22</title>
+    <title>Datos DHT22</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-    <h1>🌡️ Datos del Sensor DHT22</h1>
-    <p>📊 Total de registros: {{ datos|length }}</p>
+    <h1>Datos del Sensor DHT22</h1>
+    <p>Total de registros: {{ datos|length }}</p>
 
     <table>
         <thead>
             <tr>
                 <th>ID</th>
-                <th>🌡️ Temperatura (°C)</th>
-                <th>💧 Humedad (%)</th>
-                <th>📍 Nodo</th>
-                <th>🕒 Fecha</th>
+                <th>Temperatura (°C)</th>
+                <th>Humedad (%)</th>
+                <th>Nodo</th>
+                <th>Fecha</th>
             </tr>
         </thead>
         <tbody>
@@ -38,7 +38,7 @@
 
     <script>
         // Auto-refresh cada 30 segundos
-        setTimeout(() => location.reload(), 30000);
+        setTimeout(() => location.reload(), 5000);
     </script>
 </body>
 </html>

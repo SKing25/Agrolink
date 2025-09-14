@@ -42,7 +42,7 @@ with app.app_context():
 def recibir_datos():
     try:
         data = request.json
-        print(f"📥 Datos recibidos: {data}")  # Debug
+        print(f"Datos recibidos: {data}")  # Debug
 
         if not data:
             return jsonify({"status": "error", "mensaje": "No se recibió JSON"}), 400
@@ -63,7 +63,7 @@ def recibir_datos():
         db.session.add(nuevo_dato)
         db.session.commit()
 
-        print(f"✅ Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
+        print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
 
         return jsonify({
             "status": "ok",
@@ -72,7 +72,7 @@ def recibir_datos():
         }), 200
 
     except Exception as e:
-        print(f"❌ Error guardando dato: {e}")  # Debug
+        print(f"Error guardando dato: {e}")  # Debug
         db.session.rollback()
         return jsonify({"status": "error", "mensaje": str(e)}), 500
 
@@ -86,7 +86,7 @@ def ver_datos():
         datos_dict = [dato.to_dict() for dato in datos]
         return render_template('dht22.html', datos=datos_dict)
     except Exception as e:
-        print(f"❌ Error obteniendo datos: {e}")
+        print(f"Error obteniendo datos: {e}")
         return f"Error: {e}", 500
 
 
@@ -107,11 +107,11 @@ def home():
         ultimo_dato = DatosSensor.query.order_by(DatosSensor.fecha_creacion.desc()).first()
 
         return f"""
-        <h1>🌡️ Servidor AgroLink Activo</h1>
-        <p>📊 Total registros: {total_registros}</p>
-        <p>🕒 Último dato: {ultimo_dato.fecha_creacion if ultimo_dato else 'Sin datos'}</p>
-        <p><a href="/ver">📋 Ver datos en tabla</a></p>
-        <p><a href="/api/datos">🔗 API JSON</a></p>
+        <h1>Servidor AgroLink Activo</h1>
+        <p>Total registros: {total_registros}</p>
+        <p>Ultimo dato: {ultimo_dato.fecha_creacion if ultimo_dato else 'Sin datos'}</p>
+        <p><a href="/ver">Ver datos en tabla</a></p>
+        <p><a href="/api/datos">API JSON</a></p>
         """
     except:
         return "Servidor Flask activo. Visita /ver para ver datos."
