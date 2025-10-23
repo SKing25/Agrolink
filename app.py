@@ -63,11 +63,13 @@ def ver_datos():
         return f"Error: {e}", 500
 
 
+# Archivo: app.py
+
 @app.route('/datos', methods=['POST'])
 def recibir_datos():
     try:
         data = request.json
-        print(f"Datos recibidos: {data}")
+        print(f"Datos recibidos: {data}")  # Debug
 
         if not data:
             return jsonify({"status": "error", "mensaje": "No se recibió JSON"}), 400
@@ -88,8 +90,14 @@ def recibir_datos():
         db.session.add(nuevo_dato)
         db.session.commit()
 
+        print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
+
         # Emitir evento en tiempo real a clientes conectados
-        socketio.emit('nuevo_dato', nuevo_dato.to_dict(), broadcast=True)
+        try:
+            socketio.emit('nuevo_dato', nuevo_dato.to_dict(), to=None)  # Actualización del parámetro broadcast
+        except Exception as _e:
+            # No interrumpir la respuesta si falla el emit
+            print(f"Advertencia: no se pudo emitir por SocketIO: {_e}")
 
         return jsonify({
             "status": "ok",
@@ -98,7 +106,7 @@ def recibir_datos():
         }), 200
 
     except Exception as e:
-        print(f"Error guardando dato: {e}")
+        print(f"Error guardando dato: {e}")  # Debug
         db.session.rollback()
         return jsonify({"status": "error", "mensaje": str(e)}), 500
 
