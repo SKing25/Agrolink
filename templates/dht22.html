@@ -4,12 +4,21 @@
     <title>Datos DHT22</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .nuevo { background-color: #ffffcc !important; animation: highlight 2s; }
+        @keyframes highlight { from { background-color: #ffff00; } to { background-color: #f2f2f2; } }
+    </style>
 </head>
 <body>
     <h1>Datos del Sensor DHT22</h1>
-    <p>Total de registros: {{ datos|length }}</p>
+    <p id="total">Total de registros: {{ datos|length }}</p>
 
-    <table>
+    <table id="tabla-datos">
         <thead>
             <tr>
                 <th>ID</th>
@@ -36,9 +45,53 @@
         </tbody>
     </table>
 
+    <!-- Socket.IO client -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
-        // Auto-refresh cada 30 segundos
-        setTimeout(() => location.reload(), 5000);
+        // Conectarse al servidor Socket.IO (misma origin)
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor WebSocket', socket.id);
+        });
+
+        socket.on('nuevo_dato', (dato) => {
+            console.log('Nuevo dato recibido:', dato);
+            agregarFila(dato);
+        });
+
+        function agregarFila(dato) {
+            const tbody = document.querySelector('#tabla-datos tbody');
+            const nuevaFila = tbody.insertRow(0);
+            nuevaFila.className = 'nuevo';
+
+            const tdId = nuevaFila.insertCell(0);
+            const tdTemp = nuevaFila.insertCell(1);
+            const tdHum = nuevaFila.insertCell(2);
+            const tdNode = nuevaFila.insertCell(3);
+            const tdFecha = nuevaFila.insertCell(4);
+
+            tdId.textContent = dato.id;
+            tdTemp.textContent = parseFloat(dato.temperatura).toFixed(1) + '°C';
+            tdHum.textContent = parseFloat(dato.humedad).toFixed(1) + '%';
+            tdNode.textContent = dato.nodeId;
+            tdFecha.textContent = dato.fecha_creacion;
+
+            // Actualizar contador
+            const totalEl = document.getElementById('total');
+            const total = parseInt(totalEl.textContent.match(/\d+/)) || 0;
+            totalEl.textContent = 'Total de registros: ' + (total + 1);
+
+            // Limitar a 100 filas
+            while (tbody.rows.length > 100) {
+                tbody.deleteRow(tbody.rows.length - 1);
+            }
+        }
+
+        // Manejar desconexión
+        socket.on('disconnect', (reason) => {
+            console.warn('Desconectado:', reason);
+        });
     </script>
 </body>
 </html>

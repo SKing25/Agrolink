@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-import os
+from datetime import datetime, timezone
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
 
@@ -10,6 +10,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datos_sensores.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+socketio = SocketIO(app, cors_allowed_origins='*')
 
 
 # Modelo de base de datos
@@ -19,7 +20,7 @@ class DatosSensor(db.Model):
     humedad = db.Column(db.Float, nullable=False)
     nodeId = db.Column(db.String(50), nullable=True)
     timestamp = db.Column(db.Integer, nullable=True)
-    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
         return {
@@ -28,7 +29,7 @@ class DatosSensor(db.Model):
             'humedad': self.humedad,
             'nodeId': self.nodeId,
             'timestamp': self.timestamp,
-            'fecha_creacion': self.fecha_creacion.strftime('%Y-%m-%d %H:%M:%S')
+            'fecha_creacion': self.fecha_creacion.strftime('%Y-%m-%d %H:%M:%S %Z')
         }
 
 
@@ -64,6 +65,13 @@ def recibir_datos():
         db.session.commit()
 
         print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
+
+        # Emitir evento en tiempo real a clientes conectados
+        try:
+            socketio.emit('nuevo_dato', nuevo_dato.to_dict(), broadcast=True)
+        except Exception as _e:
+            # No interrumpir la respuesta si falla el emit
+            print(f"Advertencia: no se pudo emitir por SocketIO: {_e}")
 
         return jsonify({
             "status": "ok",
@@ -118,4 +126,5 @@ def home():
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Usar SocketIO para correr el servidor (compatible con eventlet/gevent)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True)

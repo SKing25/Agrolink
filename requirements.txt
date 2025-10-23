@@ -9,3 +9,8 @@ MarkupSafe==3.0.2
 SQLAlchemy==2.0.43
 typing_extensions==4.15.0
 Werkzeug==3.1.3
+
+# Añadidas para WebSocket en Flask
+Flask-SocketIO==5.3.5
+python-socketio==5.8.0
+eventlet==0.33.3
