@@ -16,6 +16,7 @@
 </head>
 <body>
     <h1>Datos del Sensor DHT22</h1>
+    <div id="status" style="margin-bottom:10px;padding:8px;border-radius:4px;background:#f8f9fa;color:#333">Conectando al servidor WebSocket...</div>
     <p id="total">Total de registros: {{ datos|length }}</p>
 
     <table id="tabla-datos">
@@ -48,11 +49,32 @@
     <!-- Socket.IO client -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
-        // Conectarse al servidor Socket.IO (misma origin)
-        const socket = io();
+        // Conectarse al servidor Socket.IO (misma origin). Se especifican transportes para evitar bloqueos de websockets en proxies.
+        const statusDiv = document.getElementById('status');
+        const socket = io(window.location.origin, { transports: ['websocket', 'polling'] });
 
         socket.on('connect', () => {
             console.log('Conectado al servidor WebSocket', socket.id);
+            statusDiv.textContent = 'Conectado al servidor WebSocket';
+            statusDiv.style.background = '#d4edda';
+            statusDiv.style.color = '#155724';
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('connect_error', err);
+            statusDiv.textContent = 'Error de conexión: ' + (err && err.message ? err.message : err);
+            statusDiv.style.background = '#f8d7da';
+            statusDiv.style.color = '#721c24';
+        });
+
+        socket.on('reconnect_attempt', () => {
+            console.log('Intentando reconectar...');
+            statusDiv.textContent = 'Intentando reconectar...';
+        });
+
+        socket.on('reconnect', (attempt) => {
+            console.log('Reconectado después de', attempt, 'intentos');
+            statusDiv.textContent = 'Reconectado';
         });
 
         socket.on('nuevo_dato', (dato) => {
@@ -91,6 +113,9 @@
         // Manejar desconexión
         socket.on('disconnect', (reason) => {
             console.warn('Desconectado:', reason);
+            statusDiv.textContent = 'Desconectado: ' + reason;
+            statusDiv.style.background = '#fff3cd';
+            statusDiv.style.color = '#856404';
         });
     </script>
 </body>
