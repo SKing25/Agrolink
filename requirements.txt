@@ -16,3 +16,4 @@ python-socketio==5.8.0
 eventlet==0.33.3
 Flask-CORS==4.0.0
 redis==5.0.1
+gunicorn==22.0.0
