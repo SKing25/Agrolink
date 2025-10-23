@@ -10,8 +10,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datos_sensores.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-# Usar async_mode='threading' para evitar problemas con eventlet en Python 3.12
-socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins='*')
 
 
 # Modelo de base de datos
@@ -128,9 +127,4 @@ def home():
 
 if __name__ == '__main__':
     # Usar SocketIO para correr el servidor (compatible con eventlet/gevent)
-    print("=" * 60)
-    print("Servidor AgroLink iniciado con WebSockets (modo threading)")
-    print("URL: http://0.0.0.0:5000")
-    print("Ver datos en tiempo real: http://0.0.0.0:5000/ver")
-    print("=" * 60)
     socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True)
