@@ -51,16 +51,10 @@
     <script>
         // Conectarse al servidor Socket.IO (misma origin). Se especifican transportes para evitar bloqueos de websockets en proxies.
         const statusDiv = document.getElementById('status');
-        // Para Render o servidores externos, usar polling primero
-        const socket = io(window.location.origin, {
-            transports: ['polling', 'websocket'],
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 5
-        });
+        const socket = io(window.location.origin, { transports: ['websocket', 'polling'] });
 
         socket.on('connect', () => {
-            console.log('✓ Conectado al servidor WebSocket', socket.id);
+            console.log('Conectado al servidor WebSocket', socket.id);
             statusDiv.textContent = 'Conectado al servidor WebSocket';
             statusDiv.style.background = '#d4edda';
             statusDiv.style.color = '#155724';
@@ -84,7 +78,7 @@
         });
 
         socket.on('nuevo_dato', (dato) => {
-            console.log('✓ Nuevo dato recibido vía WebSocket:', dato);
+            console.log('Nuevo dato recibido:', dato);
             agregarFila(dato);
         });
 

@@ -1,24 +1,17 @@
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone
-from flask_socketio import SocketIO, emit
-from flask_cors import CORS
-import os  # <-- Importar os
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
-CORS(app)
-
-# Configurar el message queue usando la variable de entorno REDIS_URL
-# Si REDIS_URL no está definida, no se usará un message queue (útil para desarrollo local)
-message_queue = os.environ.get('REDIS_URL', None)
 
 # Configurar base de datos SQLite
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datos_sensores.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-# Inicializar SocketIO con el message queue
-socketio = SocketIO(app, cors_allowed_origins='*', message_queue=message_queue)
+# Usar async_mode='threading' para evitar problemas con eventlet en Python 3.12
+socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
 
 # Modelo de base de datos
@@ -75,10 +68,11 @@ def recibir_datos():
         print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
 
         # Emitir evento en tiempo real a clientes conectados
-        dato_dict = nuevo_dato.to_dict()
-        print(f"EMITIENDO VÍA WEBSOCKET: {dato_dict}")
-        # Esta emisión ahora funcionará a través de todos los procesos gracias a Redis
-        socketio.emit('nuevo_dato', dato_dict, broadcast=True)
+        try:
+            socketio.emit('nuevo_dato', nuevo_dato.to_dict(), broadcast=True)
+        except Exception as _e:
+            # No interrumpir la respuesta si falla el emit
+            print(f"Advertencia: no se pudo emitir por SocketIO: {_e}")
 
         return jsonify({
             "status": "ok",
@@ -132,16 +126,11 @@ def home():
         return "Servidor Flask activo. Visita /ver para ver datos."
 
 
-# Handler para cuando un cliente WebSocket se conecta
-@socketio.on('connect')
-def handle_connect():
-    print('✓ Cliente WebSocket conectado')
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    print('✗ Cliente WebSocket desconectado')
-
-
 if __name__ == '__main__':
     # Usar SocketIO para correr el servidor (compatible con eventlet/gevent)
+    print("=" * 60)
+    print("Servidor AgroLink iniciado con WebSockets (modo threading)")
+    print("URL: http://0.0.0.0:5000")
+    print("Ver datos en tiempo real: http://0.0.0.0:5000/ver")
+    print("=" * 60)
     socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True)
