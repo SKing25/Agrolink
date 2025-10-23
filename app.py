@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 # Configurar base de datos SQLite
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datos_sensores.db'
@@ -67,11 +69,9 @@ def recibir_datos():
         print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
 
         # Emitir evento en tiempo real a clientes conectados
-        try:
-            socketio.emit('nuevo_dato', nuevo_dato.to_dict(), broadcast=True)
-        except Exception as _e:
-            # No interrumpir la respuesta si falla el emit
-            print(f"Advertencia: no se pudo emitir por SocketIO: {_e}")
+        dato_dict = nuevo_dato.to_dict()
+        print(f"EMITIENDO VÍA WEBSOCKET: {dato_dict}")
+        socketio.emit('nuevo_dato', dato_dict, broadcast=True)
 
         return jsonify({
             "status": "ok",
@@ -123,6 +123,16 @@ def home():
         """
     except:
         return "Servidor Flask activo. Visita /ver para ver datos."
+
+
+# Handler para cuando un cliente WebSocket se conecta
+@socketio.on('connect')
+def handle_connect():
+    print('✓ Cliente WebSocket conectado')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('✗ Cliente WebSocket desconectado')
 
 
 if __name__ == '__main__':
