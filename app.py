@@ -3,16 +3,22 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
+import os  # <-- Importar os
 
 app = Flask(__name__)
 CORS(app)
+
+# Configurar el message queue usando la variable de entorno REDIS_URL
+# Si REDIS_URL no está definida, no se usará un message queue (útil para desarrollo local)
+message_queue = os.environ.get('REDIS_URL', None)
 
 # Configurar base de datos SQLite
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datos_sensores.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-socketio = SocketIO(app, cors_allowed_origins='*')
+# Inicializar SocketIO con el message queue
+socketio = SocketIO(app, cors_allowed_origins='*', message_queue=message_queue)
 
 
 # Modelo de base de datos
@@ -71,6 +77,7 @@ def recibir_datos():
         # Emitir evento en tiempo real a clientes conectados
         dato_dict = nuevo_dato.to_dict()
         print(f"EMITIENDO VÍA WEBSOCKET: {dato_dict}")
+        # Esta emisión ahora funcionará a través de todos los procesos gracias a Redis
         socketio.emit('nuevo_dato', dato_dict, broadcast=True)
 
         return jsonify({
