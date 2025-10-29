@@ -1,19 +1,5 @@
+# Ignorar todo por defecto
 *
-
-# Entorno virtual Python
-mqtt_bridge_env/
-
-# Archivos temporales
-*.tmp
-*.bak
-*~
-
-# Archivos de sistema
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
 
 # Permitir carpetas específicas
 !src/
@@ -25,3 +11,13 @@ Thumbs.db
 !platformio.ini
 !.gitignore
 !README.md
+
+# Ignorar archivos temporales incluso en src y variants
+**/*.tmp
+**/*.bak
+**/*~
+**/*.log
+
+# Ignorar archivos de sistema
+**/.DS_Store
+**/Thumbs.db
