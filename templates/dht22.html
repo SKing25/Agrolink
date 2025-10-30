@@ -5,16 +5,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
+        body { margin: 0; font-family: Arial, sans-serif; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #4CAF50; color: white; }
         tr:nth-child(even) { background-color: #f2f2f2; }
         .nuevo { background-color: #ffffcc !important; animation: highlight 2s; }
         @keyframes highlight { from { background-color: #ffff00; } to { background-color: #f2f2f2; } }
+        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #ffffff; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 10; }
+        .navbar .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: #111827; font-weight: 700; }
+        .navbar .brand img { height: 36px; width: auto; display: block; }
+        .nav-links { display: flex; align-items: center; gap: 16px; list-style: none; margin: 0; padding: 0; }
+        .nav-links a { text-decoration: none; color: #111827; padding: 8px 10px; border-radius: 6px; }
+        .nav-links a:hover { background: #f3f4f6; }
+        .dropdown { position: relative; }
+        .dropdown > a, .dropdown > span { cursor: default; }
+        .submenu { display: none; position: absolute; top: 100%; left: 0; min-width: 180px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,.06); list-style: none; margin: 6px 0 0; padding: 6px; }
+        .submenu li { margin: 0; }
+        .submenu a, .submenu span { display: block; padding: 8px 10px; color: #111827; text-decoration: none; border-radius: 6px; }
+        .submenu a:hover { background: #f3f4f6; }
+        .dropdown:hover .submenu { display: block; }
+        .container { padding: 16px; }
     </style>
 </head>
 <body>
+    <nav class="navbar">
+        <a href="{{ url_for('home') }}" class="brand" title="Inicio">
+            <img src="{{ url_for('static', filename='agrolink.jpeg') }}" alt="AgroLink" />
+            <span>AgroLink</span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('ver_datos') }}">Tabla</a></li>
+            <li class="dropdown">
+                <span>Nodos</span>
+                <ul class="submenu">
+                    {% for node in nodos %}
+                    <li><a href="{{ url_for('ver_por_nodo', node_id=node) }}">{{ node }}</a></li>
+                    {% else %}
+                    <li><span>Sin nodos</span></li>
+                    {% endfor %}
+                </ul>
+            </li>
+        </ul>
+    </nav>
+
+
+    <div class="container">
     <h1>Datos del Sensor DHT22</h1>
     <div id="status" style="margin-bottom:10px;padding:8px;border-radius:4px;background:#f8f9fa;color:#333">Conectando al servidor WebSocket...</div>
     <p id="total">Total de registros: {{ datos|length }}</p>
@@ -45,7 +81,7 @@
             {% endfor %}
         </tbody>
     </table>
-
+    </div>
     <!-- Socket.IO client -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>

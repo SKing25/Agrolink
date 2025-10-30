@@ -10,7 +10,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datos_sensores.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-socketio = SocketIO(app, cors_allowed_origins='*')
+# Forzar modo threading para evitar cargar eventlet/gevent (corrige error ssl.wrap_socket)
+socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
 
 # ==================== MODELO DE DATOS ====================
@@ -46,13 +47,34 @@ def home():
     try:
         total_registros = DatosSensor.query.count()
         ultimo_dato = DatosSensor.query.order_by(DatosSensor.fecha_creacion.desc()).first()
+        # Obtener lista de nodos únicos para la barra de navegación
+        nodos = [row[0] for row in db.session.query(DatosSensor.nodeId).distinct().order_by(DatosSensor.nodeId.asc()).all() if row[0]]
 
-        return render_template('home.html',
+        return render_template('index.html',
                                total_registros=total_registros,
-                               ultimo_dato=ultimo_dato
+                               ultimo_dato=ultimo_dato,
+                               nodos=nodos
                                )
     except Exception as e:
         return f"Servidor AgroLink activo. Error: {str(e)}"
+
+
+@app.route('/nodo/<string:node_id>')
+def ver_por_nodo(node_id: str):
+    try:
+        # Datos más recientes de ese nodo
+        dato = DatosSensor.query.filter_by(nodeId=node_id).order_by(DatosSensor.fecha_creacion.desc()).first()
+        total_registros = DatosSensor.query.filter_by(nodeId=node_id).count()
+        # Lista de nodos para mantener el menú
+        nodos = [row[0] for row in db.session.query(DatosSensor.nodeId).distinct().order_by(DatosSensor.nodeId.asc()).all() if row[0]]
+
+        return render_template('index.html',
+                               total_registros=total_registros,
+                               ultimo_dato=dato,
+                               nodos=nodos
+                               )
+    except Exception as e:
+        return f"Error: {e}", 500
 
 
 @app.route('/ver')
@@ -92,11 +114,10 @@ def recibir_datos():
 
         print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
 
-        # Emitir evento en tiempo real a clientes conectados
+        # Emitir evento en tiempo real a todos los clientes conectados
         try:
-            socketio.emit('nuevo_dato', nuevo_dato.to_dict(), to=None)  # Actualización del parámetro broadcast
+            socketio.emit('nuevo_dato', nuevo_dato.to_dict())
         except Exception as _e:
-            # No interrumpir la respuesta si falla el emit
             print(f"Advertencia: no se pudo emitir por SocketIO: {_e}")
 
         return jsonify({
@@ -126,8 +147,7 @@ def api_datos():
 @socketio.on('connect')
 def handle_connect():
     """Maneja la conexión de un nuevo cliente"""
-    print(f'Cliente conectado: {request.sid}')
-    # Enviar datos iniciales al cliente que se conecta
+    print('Cliente conectado')
     try:
         ultimos_datos = DatosSensor.query.order_by(DatosSensor.fecha_creacion.desc()).limit(10).all()
         emit('datos_iniciales', {
@@ -140,8 +160,7 @@ def handle_connect():
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Registra la desconexión de un cliente"""
-    print(f'Cliente desconectado: {request.sid}')
+    print('Cliente desconectado')
 
 
 @socketio.on('solicitar_datos')
