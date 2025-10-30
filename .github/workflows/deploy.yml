@@ -29,7 +29,7 @@ jobs:
         username: ${{ secrets.DO_USER }}
         key: ${{ secrets.DO_SSH_KEY }}
         script: |
-          cd /home/${{ secrets.DO_USER }}/flask-app
+          cd /root/Agrolink
           docker build -t flask-app .
           docker stop flask-app || true
           docker rm flask-app || true
