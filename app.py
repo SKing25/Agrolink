@@ -11,7 +11,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 # Forzar modo threading para evitar cargar eventlet/gevent (corrige error ssl.wrap_socket)
-socketio = SocketIO(app, cors_allowed_origins='*', async_mode='gevent')
+socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
 
 # ==================== MODELO DE DATOS ====================
