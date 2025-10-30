@@ -13,15 +13,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Copy files to droplet
-      uses: appleboy/scp-action@v0.1.4
-      with:
-        host: ${{ secrets.DO_HOST }}
-        username: ${{ secrets.DO_USER }}
-        key: ${{ secrets.DO_SSH_KEY }}
-        source: "."
-        target: "${{ secrets.DO_USER }}/Agrolink"
-
     - name: SSH and redeploy
       uses: appleboy/ssh-action@v0.1.10
       with:
@@ -30,14 +21,18 @@ jobs:
         key: ${{ secrets.DO_SSH_KEY }}
         script: |
           cd /root/Agrolink
+          # Hacer pull de los cambios más recientes
+          git pull origin master
           # Detener y remover contenedor anterior
           docker stop flask-app || true
           docker rm flask-app || true
-          # Limpiar imágenes no utilizadas para ahorrar espacio
-          docker image prune -f
-          # Construir nueva imagen
-          docker build -t flask-app .
+          # Limpiar imágenes no utilizadas y cache
+          docker image prune -af
+          docker builder prune -af
+          # Construir nueva imagen sin cache
+          docker build --no-cache -t flask-app .
           # Ejecutar contenedor en modo daemon
           docker run -d --restart always -p 5000:5000 --name flask-app flask-app
           # Verificar que está corriendo
           docker ps | grep flask-app
+          echo "Deployment completado exitosamente"
