@@ -1,7 +1,19 @@
 from flask import Flask, request, jsonify, render_template
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timezone
+from datetime import datetime
 from flask_socketio import SocketIO, emit
+from database import (
+    inicializar_db,
+    guardar_dato_sensor,
+    obtener_todos_datos,
+    obtener_datos_paginados,
+    obtener_datos_por_fecha,
+    obtener_estadisticas,
+    contar_registros,
+    obtener_ultimo_dato,
+    obtener_nodos_unicos,
+    eliminar_dato
+)
+import folium
 
 app = Flask(__name__)
 
@@ -9,35 +21,17 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datos_sensores.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
+# Inicializar base de datos
+inicializar_db(app)
+
 # Forzar modo threading para evitar cargar eventlet/gevent (corrige error ssl.wrap_socket)
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
-
-# ==================== MODELO DE DATOS ====================
-
-class DatosSensor(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    temperatura = db.Column(db.Float, nullable=False)
-    humedad = db.Column(db.Float, nullable=False)
-    nodeId = db.Column(db.String(50), nullable=True)
-    timestamp = db.Column(db.Integer, nullable=True)
-    fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'temperatura': self.temperatura,
-            'humedad': self.humedad,
-            'nodeId': self.nodeId,
-            'timestamp': self.timestamp,
-            'fecha_creacion': self.fecha_creacion.strftime('%Y-%m-%d %H:%M:%S %Z')
-        }
-
-
-# Crear tablas al iniciar
-with app.app_context():
-    db.create_all()
+# PROBANDO MAPITA
+def crear_mapa(latitud, longitud):
+    m = folium.Map(location=[latitud, longitud], zoom_start=20)
+    folium.Marker([latitud, longitud], popup='La checho').add_to(m)
+    return m._repr_html_()
 
 
 # ==================== RUTAS HTTP ====================
@@ -45,16 +39,17 @@ with app.app_context():
 @app.route('/')
 def home():
     try:
-        total_registros = DatosSensor.query.count()
-        ultimo_dato = DatosSensor.query.order_by(DatosSensor.fecha_creacion.desc()).first()
-        # Obtener lista de nodos únicos para la barra de navegación
-        nodos = [row[0] for row in db.session.query(DatosSensor.nodeId).distinct().order_by(DatosSensor.nodeId.asc()).all() if row[0]]
-
+        total_registros = contar_registros()
+        ultimo_dato = obtener_ultimo_dato()
+        nodos = obtener_nodos_unicos()
+        mapa_html = crear_mapa(4.660753, -74.059945)  # PROBANDO MAPITA
         return render_template('index.html',
                                total_registros=total_registros,
                                ultimo_dato=ultimo_dato,
-                               nodos=nodos
+                               nodos=nodos,
+                               mapa=mapa_html # PROBANDO MAPITA
                                )
+
     except Exception as e:
         return f"Servidor AgroLink activo. Error: {str(e)}"
 
@@ -62,11 +57,9 @@ def home():
 @app.route('/nodo/<string:node_id>')
 def ver_por_nodo(node_id: str):
     try:
-        # Datos más recientes de ese nodo
-        dato = DatosSensor.query.filter_by(nodeId=node_id).order_by(DatosSensor.fecha_creacion.desc()).first()
-        total_registros = DatosSensor.query.filter_by(nodeId=node_id).count()
-        # Lista de nodos para mantener el menú
-        nodos = [row[0] for row in db.session.query(DatosSensor.nodeId).distinct().order_by(DatosSensor.nodeId.asc()).all() if row[0]]
+        dato = obtener_ultimo_dato(node_id=node_id)
+        total_registros = contar_registros(node_id=node_id)
+        nodos = obtener_nodos_unicos()
 
         return render_template('index.html',
                                total_registros=total_registros,
@@ -100,17 +93,13 @@ def recibir_datos():
         if 'temperatura' not in data or 'humedad' not in data:
             return jsonify({"status": "error", "mensaje": "Faltan campos temperatura/humedad"}), 400
 
-        # Crear nuevo registro
-        nuevo_dato = DatosSensor(
-            temperatura=float(data['temperatura']),
-            humedad=float(data['humedad']),
-            nodeId=data.get('nodeId', 'unknown'),
-            timestamp=data.get('timestamp', int(datetime.now().timestamp()))
+        # Guardar en base de datos usando la función del módulo database
+        nuevo_dato = guardar_dato_sensor(
+            temperatura=data['temperatura'],
+            humedad=data['humedad'],
+            node_id=data.get('nodeId', 'unknown'),
+            timestamp=data.get('timestamp')
         )
-
-        # Guardar en base de datos
-        db.session.add(nuevo_dato)
-        db.session.commit()
 
         print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
 
@@ -128,7 +117,6 @@ def recibir_datos():
 
     except Exception as e:
         print(f"Error guardando dato: {e}")  # Debug
-        db.session.rollback()
         return jsonify({"status": "error", "mensaje": str(e)}), 500
 
 
@@ -136,7 +124,7 @@ def recibir_datos():
 def api_datos():
     try:
         limit = request.args.get('limit', 100, type=int)
-        datos = DatosSensor.query.order_by(DatosSensor.fecha_creacion.desc()).limit(limit).all()
+        datos = obtener_todos_datos(limit=limit)
         return jsonify([dato.to_dict() for dato in datos])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -149,7 +137,7 @@ def handle_connect():
     """Maneja la conexión de un nuevo cliente"""
     print('Cliente conectado')
     try:
-        ultimos_datos = DatosSensor.query.order_by(DatosSensor.fecha_creacion.desc()).limit(10).all()
+        ultimos_datos = obtener_todos_datos(limit=10)
         emit('datos_iniciales', {
             'datos': [dato.to_dict() for dato in ultimos_datos],
             'mensaje': f'Conectado al servidor AgroLink. {len(ultimos_datos)} registros enviados.'
@@ -171,12 +159,7 @@ def handle_solicitar_datos(data):
         offset = data.get('offset', 0)
         node_id = data.get('nodeId')
 
-        query = DatosSensor.query.order_by(DatosSensor.fecha_creacion.desc())
-
-        if node_id:
-            query = query.filter_by(nodeId=node_id)
-
-        datos = query.offset(offset).limit(limit).all()
+        datos = obtener_datos_paginados(limit=limit, offset=offset, node_id=node_id)
 
         emit('resultado_datos', {
             'datos': [dato.to_dict() for dato in datos],
@@ -199,9 +182,7 @@ def handle_filtrar_por_fecha(data):
             emit('error', {'mensaje': 'Formato de fechas inválido'})
             return
 
-        datos = DatosSensor.query.filter(
-            DatosSensor.fecha_creacion.between(fecha_inicio, fecha_fin)
-        ).order_by(DatosSensor.fecha_creacion).all()
+        datos = obtener_datos_por_fecha(fecha_inicio, fecha_fin)
 
         emit('resultado_filtrado', {
             'datos': [dato.to_dict() for dato in datos],
@@ -217,36 +198,8 @@ def handle_filtrar_por_fecha(data):
 def handle_estadisticas(data):
     """Obtiene estadísticas de los datos de sensores"""
     try:
-        from sqlalchemy import func
-
-        # Calcular estadísticas
-        stats = db.session.query(
-            func.avg(DatosSensor.temperatura).label('temp_promedio'),
-            func.max(DatosSensor.temperatura).label('temp_maxima'),
-            func.min(DatosSensor.temperatura).label('temp_minima'),
-            func.avg(DatosSensor.humedad).label('hum_promedio'),
-            func.max(DatosSensor.humedad).label('hum_maxima'),
-            func.min(DatosSensor.humedad).label('hum_minima'),
-            func.count(DatosSensor.id).label('total_registros')
-        ).one()
-
-        # Obtener último registro
-        ultimo_registro = DatosSensor.query.order_by(DatosSensor.fecha_creacion.desc()).first()
-
-        emit('resultado_estadisticas', {
-            'temperatura': {
-                'promedio': float(stats.temp_promedio) if stats.temp_promedio else 0,
-                'maxima': float(stats.temp_maxima) if stats.temp_maxima else 0,
-                'minima': float(stats.temp_minima) if stats.temp_minima else 0
-            },
-            'humedad': {
-                'promedio': float(stats.hum_promedio) if stats.hum_promedio else 0,
-                'maxima': float(stats.hum_maxima) if stats.hum_maxima else 0,
-                'minima': float(stats.hum_minima) if stats.hum_minima else 0
-            },
-            'total_registros': stats.total_registros,
-            'ultimo_registro': ultimo_registro.to_dict() if ultimo_registro else None
-        })
+        estadisticas = obtener_estadisticas()
+        emit('resultado_estadisticas', estadisticas)
     except Exception as e:
         emit('error', {'mensaje': f'Error al obtener estadísticas: {str(e)}'})
 
@@ -261,13 +214,10 @@ def handle_eliminar_dato(data):
             emit('error', {'mensaje': 'ID no proporcionado'})
             return
 
-        dato = DatosSensor.query.get(id_dato)
-        if not dato:
+        eliminado = eliminar_dato(id_dato)
+        if not eliminado:
             emit('error', {'mensaje': f'Dato con ID {id_dato} no encontrado'})
             return
-
-        db.session.delete(dato)
-        db.session.commit()
 
         emit('dato_eliminado', {
             'id': id_dato,
@@ -281,7 +231,6 @@ def handle_eliminar_dato(data):
         }, broadcast=True)
 
     except Exception as e:
-        db.session.rollback()
         emit('error', {'mensaje': f'Error al eliminar dato: {str(e)}'})
 
 

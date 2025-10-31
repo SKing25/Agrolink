@@ -3,29 +3,14 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AgroLink - Inicio</title>
-    <style>
-        body { margin: 0; font-family: Arial, sans-serif; }
-        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #ffffff; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 10; }
-        .navbar .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: #111827; font-weight: 700; }
-        .navbar .brand img { height: 36px; width: auto; display: block; }
-        .nav-links { display: flex; align-items: center; gap: 16px; list-style: none; margin: 0; padding: 0; }
-        .nav-links a { text-decoration: none; color: #111827; padding: 8px 10px; border-radius: 6px; }
-        .nav-links a:hover { background: #f3f4f6; }
-        .dropdown { position: relative; }
-        .dropdown > a, .dropdown > span { cursor: default; }
-        .submenu { display: none; position: absolute; top: 100%; left: 0; min-width: 180px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,.06); list-style: none; margin: 6px 0 0; padding: 6px; }
-        .submenu li { margin: 0; }
-        .submenu a, .submenu span { display: block; padding: 8px 10px; color: #111827; text-decoration: none; border-radius: 6px; }
-        .submenu a:hover { background: #f3f4f6; }
-        .dropdown:hover .submenu { display: block; }
-        .container { padding: 16px; }
-    </style>
+    <title>AgroLink</title>
+    <link rel="icon" href="{{ url_for('static', filename='agrolink.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <nav class="navbar">
         <a href="{{ url_for('home') }}" class="brand" title="Inicio">
-            <img src="{{ url_for('static', filename='agrolink.jpeg') }}" alt="AgroLink" />
+            <img src="{{ url_for('static', filename='agrolink.png') }}" alt="AgroLink" />
             <span>AgroLink</span>
         </a>
         <ul class="nav-links">
@@ -45,9 +30,12 @@
 
     <div class="container">
         <h1>Bienvenido a AgroLink</h1>
-        <p>Utilice la barra de navegación para ver los datos del sensor DHT22.</p>
-        <p>PROBANDO DEPLOY</p>
+        <p>Proximamente mas info ;)</p>
+        {% if mapa %}
+        <h2>Probando mapita</h2>
+        <div class="map-container">
+            {{ mapa|safe }}
+        {% endif %}
     </div>
 </body>
 </html>
-
