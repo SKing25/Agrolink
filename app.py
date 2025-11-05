@@ -90,8 +90,8 @@ def recibir_datos():
             return jsonify({"status": "error", "mensaje": "No se recibió JSON"}), 400
 
         # Validar campos requeridos
-        if 'temperatura' not in data or 'humedad' not in data:
-            return jsonify({"status": "error", "mensaje": "Faltan campos temperatura/humedad"}), 400
+        #  if 'temperatura' not in data or 'humedad' not in data:
+        #     return jsonify({"status": "error", "mensaje": "Faltan campos temperatura/humedad"}), 400
 
         # Guardar en base de datos usando la función del módulo database
         nuevo_dato = guardar_dato_sensor(
