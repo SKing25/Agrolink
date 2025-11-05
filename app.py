@@ -57,11 +57,15 @@ def home():
 @app.route('/nodo/<string:node_id>')
 def ver_por_nodo(node_id: str):
     try:
+        # Obtener datos del nodo específico
+        datos = obtener_datos_paginados(limit=100, offset=0, node_id=node_id)
         dato = obtener_ultimo_dato(node_id=node_id)
         total_registros = contar_registros(node_id=node_id)
         nodos = obtener_nodos_unicos()
 
-        return render_template('index.html',
+        return render_template('nodo.html',
+                               node_id=node_id,
+                               datos=datos,
                                total_registros=total_registros,
                                ultimo_dato=dato,
                                nodos=nodos
