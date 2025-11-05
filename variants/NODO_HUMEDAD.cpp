@@ -13,16 +13,15 @@ painlessMesh mesh;
 DHT dht(DHTPIN, DHTTYPE);
 
 Task taskSendData(TASK_SECOND * 10, TASK_FOREVER, []() {
-  float temp = dht.readTemperature();
   float hum = dht.readHumidity();
 
-  if (!isnan(temp) && !isnan(hum)) {
-    String msg = "{\"temperature\":" + String(temp) + ",\"humidity\":" + String(hum) + "}";
+  if (!isnan(hum)) {
+    String msg = "{\"humidity\":" + String(hum) + "}";
     mesh.sendBroadcast(msg);
     Serial.println("Enviado: " + msg);
     Serial.printf("Nodos conectados: %d\n", mesh.getNodeList().size());
   } else {
-    Serial.println("Error leyendo DHT22");
+    Serial.println("Error leyendo DHT22 (HUMEDAD)");
   }
 });
 
@@ -41,13 +40,16 @@ void changedConnectionCallback() {
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  Serial.println("=== INICIANDO NODO DHT22 ===");
+  Serial.println("=== INICIANDO NODO DHT22 (HUMEDAD) ===");
   
   dht.begin();
-  Serial.println("DHT22 iniciado");
+  Serial.println("DHT22 (HUMEDAD) iniciado");
 
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+  
+  Serial.printf("NODE ID: %u\n", mesh.getNodeId());
+  
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);

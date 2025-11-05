@@ -72,6 +72,9 @@ void setup() {
 
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+
+  Serial.printf("NODE ID: %u\n", mesh.getNodeId());
+  
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);  // AGREGAR ESTA LÍNEA

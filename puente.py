@@ -7,7 +7,7 @@ BROKER = "localhost"
 PORT = 1883
 TOPIC = "dht22/datos/+" 
 
-SERVER_URL = "https://agrolink-hd2p.onrender.com/datos"
+SERVER_URL = "https://agrolink.app/datos"
 
 def parse_message(payload):
     try:
