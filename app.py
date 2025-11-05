@@ -93,6 +93,24 @@ def recibir_datos():
             return jsonify({"status": "error", "mensaje": "No se recibió JSON"}), 400
 
         # Aceptar temperatura y/o humedad opcionales
+        if 'temperatura' not in data:
+            for alt in ('temperature', 'temp', 't'):
+                if alt in data:
+                    try:
+                        data['temperatura'] = float(data.pop(alt))
+                    except Exception:
+                        data.setdefault('temperatura', data.pop(alt))
+                    break
+
+        if 'humedad' not in data:
+            for alt in ('humidity', 'hum', 'h'):
+                if alt in data:
+                    try:
+                        data['humedad'] = float(data.pop(alt))
+                    except Exception:
+                        data.setdefault('humedad', data.pop(alt))
+                    break
+
         temperatura = data.get('temperatura')
         humedad = data.get('humedad')
         node_id = data.get('nodeId') or data.get('node_id') or 'unknown'
