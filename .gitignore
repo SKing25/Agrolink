@@ -10,6 +10,7 @@
 # Permitir archivos de configuración importantes
 !platformio.ini
 !.gitignore
+!.gitattributes
 !README.md
 
 # Ignorar archivos temporales incluso en src y variants

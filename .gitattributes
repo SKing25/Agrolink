@@ -1,0 +1,7 @@
+# Configuración de detección de lenguajes para GitHub
+*.cpp linguist-detectable=true
+*.py linguist-detectable=true
+
+# Excluir archivos generados automáticamente
+.pio/** linguist-generated=true
+.vscode/** linguist-vendored=true
