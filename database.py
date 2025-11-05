@@ -14,8 +14,8 @@ db = SQLAlchemy()
 class DatosSensor(db.Model):
     """Modelo para almacenar datos de sensores DHT22"""
     id = db.Column(db.Integer, primary_key=True)
-    temperatura = db.Column(db.Float, nullable=False)
-    humedad = db.Column(db.Float, nullable=False)
+    temperatura = db.Column(db.Float, nullable=True)
+    humedad = db.Column(db.Float, nullable=True)
     nodeId = db.Column(db.String(50), nullable=True)
     timestamp = db.Column(db.Integer, nullable=True)
     fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -24,8 +24,8 @@ class DatosSensor(db.Model):
         """Convierte el objeto a diccionario para serialización JSON"""
         return {
             'id': self.id,
-            'temperatura': self.temperatura,
-            'humedad': self.humedad,
+            'temperatura': None if self.temperatura is None else float(self.temperatura),
+            'humedad': None if self.humedad is None else float(self.humedad),
             'nodeId': self.nodeId,
             'timestamp': self.timestamp,
             'fecha_creacion': self.fecha_creacion.strftime('%Y-%m-%d %H:%M:%S %Z')
@@ -46,8 +46,8 @@ def guardar_dato_sensor(temperatura, humedad, node_id='unknown', timestamp=None)
     Guarda un nuevo dato de sensor en la base de datos
     
     Args:
-        temperatura: Temperatura en °C
-        humedad: Humedad en %
+        temperatura: Temperatura en °C o None
+        humedad: Humedad en % o None
         node_id: ID del nodo sensor
         timestamp: Timestamp Unix (opcional)
     
@@ -61,9 +61,13 @@ def guardar_dato_sensor(temperatura, humedad, node_id='unknown', timestamp=None)
         if timestamp is None:
             timestamp = int(datetime.now().timestamp())
         
+        # Convertir a float sólo si no es None
+        temp_val = float(temperatura) if temperatura is not None else None
+        hum_val = float(humedad) if humedad is not None else None
+
         nuevo_dato = DatosSensor(
-            temperatura=float(temperatura),
-            humedad=float(humedad),
+            temperatura=temp_val,
+            humedad=hum_val,
             nodeId=node_id,
             timestamp=timestamp
         )
@@ -227,4 +231,3 @@ def eliminar_dato(dato_id):
     except Exception as e:
         db.session.rollback()
         raise e
-

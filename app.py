@@ -73,7 +73,10 @@ def ver_por_nodo(node_id: str):
 @app.route('/ver')
 def ver_datos():
     try:
-        return render_template('dht22.html')
+        # Enviar los últimos 100 datos y la lista de nodos al template para que pueda renderizar y recibir actualizaciones
+        datos = obtener_todos_datos(limit=100)
+        nodos = obtener_nodos_unicos()
+        return render_template('dht22.html', datos=datos, nodos=nodos)
     except Exception as e:
         return f"Error: {e}", 500
 
@@ -83,29 +86,38 @@ def ver_datos():
 @app.route('/datos', methods=['POST'])
 def recibir_datos():
     try:
-        data = request.json
+        data = request.get_json(silent=True)
         print(f"Datos recibidos: {data}")  # Debug
 
         if not data:
             return jsonify({"status": "error", "mensaje": "No se recibió JSON"}), 400
 
-        # Validar campos requeridos
-        #  if 'temperatura' not in data or 'humedad' not in data:
-        #     return jsonify({"status": "error", "mensaje": "Faltan campos temperatura/humedad"}), 400
+        # Aceptar temperatura y/o humedad opcionales
+        temperatura = data.get('temperatura')
+        humedad = data.get('humedad')
+        node_id = data.get('nodeId') or data.get('node_id') or 'unknown'
+        timestamp = data.get('timestamp')
+
+        # Validar que venga al menos uno
+        if temperatura is None and humedad is None:
+            return jsonify({"status": "error", "mensaje": "Falta temperatura y humedad"}), 400
 
         # Guardar en base de datos usando la función del módulo database
         nuevo_dato = guardar_dato_sensor(
-            temperatura=data['temperatura'],
-            humedad=data['humedad'],
-            node_id=data.get('nodeId', 'unknown'),
-            timestamp=data.get('timestamp')
+            temperatura=temperatura,
+            humedad=humedad,
+            node_id=node_id,
+            timestamp=timestamp
         )
 
         print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
 
         # Emitir evento en tiempo real a todos los clientes conectados
         try:
-            socketio.emit('nuevo_dato', nuevo_dato.to_dict())
+            payload = nuevo_dato.to_dict()
+            # Filtrar claves con valor None (no enviar temperatura/humedad si no vinieron)
+            payload_filtrado = {k: v for k, v in payload.items() if not (k in ('temperatura','humedad') and v is None)}
+            socketio.emit('nuevo_dato', payload_filtrado, broadcast=True)
         except Exception as _e:
             print(f"Advertencia: no se pudo emitir por SocketIO: {_e}")
 
