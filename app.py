@@ -117,7 +117,8 @@ def recibir_datos():
             payload = nuevo_dato.to_dict()
             # Filtrar claves con valor None (no enviar temperatura/humedad si no vinieron)
             payload_filtrado = {k: v for k, v in payload.items() if not (k in ('temperatura','humedad') and v is None)}
-            socketio.emit('nuevo_dato', payload_filtrado, broadcast=True)
+            # Emitir a todos los clientes conectados (sin usar parámetro 'broadcast' para compatibilidad)
+            socketio.emit('nuevo_dato', payload_filtrado)
         except Exception as _e:
             print(f"Advertencia: no se pudo emitir por SocketIO: {_e}")
 
@@ -240,7 +241,7 @@ def handle_eliminar_dato(data):
         socketio.emit('actualizacion_datos', {
             'accion': 'eliminar',
             'id': id_dato
-        }, broadcast=True)
+        })
 
     except Exception as e:
         emit('error', {'mensaje': f'Error al eliminar dato: {str(e)}'})

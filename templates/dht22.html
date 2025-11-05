@@ -48,10 +48,22 @@
             {% for dato in datos %}
             <tr>
                 <td>{{ dato.id }}</td>
-                <td class="temp">{{ "%.1f"|format(dato.temperatura) }}°C</td>
-                <td class="hum">{{ "%.1f"|format(dato.humedad) }}%</td>
-                <td>{{ dato.nodeId }}</td>
-                <td>{{ dato.fecha_creacion }}</td>
+                <td class="temp">
+                    {% if dato.temperatura is not none %}
+                        {{ "%.1f"|format(dato.temperatura) }}°C
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="hum">
+                    {% if dato.humedad is not none %}
+                        {{ "%.1f"|format(dato.humedad) }}%
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ dato.nodeId or '-' }}</td>
+                <td>{{ dato.fecha_creacion or '-' }}</td>
             </tr>
             {% else %}
             <tr>
@@ -75,6 +87,23 @@
             statusDiv.style.color = '#155724';
         });
 
+        socket.on('datos_iniciales', (payload) => {
+            try {
+                console.log('Datos iniciales recibidos', payload);
+                if (payload && payload.datos && Array.isArray(payload.datos)) {
+                    // reemplazar tabla actual por los datos iniciales
+                    const tbody = document.querySelector('#tabla-datos tbody');
+                    tbody.innerHTML = '';
+                    payload.datos.forEach(d => agregarFilaDesdeObjeto(d, false));
+                    // actualizar contador
+                    const totalEl = document.getElementById('total');
+                    totalEl.textContent = 'Total de registros: ' + payload.datos.length;
+                }
+            } catch (e) {
+                console.error('Error procesando datos iniciales:', e);
+            }
+        });
+
         socket.on('connect_error', (err) => {
             console.error('connect_error', err);
             statusDiv.textContent = 'Error de conexión: ' + (err && err.message ? err.message : err);
@@ -94,12 +123,12 @@
 
         socket.on('nuevo_dato', (dato) => {
             console.log('Nuevo dato recibido:', dato);
-            agregarFila(dato);
+            agregarFilaDesdeObjeto(dato, true);
         });
 
-        function agregarFila(dato) {
+        function agregarFilaDesdeObjeto(dato, alFrente=true) {
             const tbody = document.querySelector('#tabla-datos tbody');
-            const nuevaFila = tbody.insertRow(0);
+            const nuevaFila = alFrente ? tbody.insertRow(0) : tbody.insertRow(-1);
             nuevaFila.className = 'nuevo';
 
             const tdId = nuevaFila.insertCell(0);
@@ -108,16 +137,30 @@
             const tdNode = nuevaFila.insertCell(3);
             const tdFecha = nuevaFila.insertCell(4);
 
-            tdId.textContent = dato.id;
-            tdTemp.textContent = parseFloat(dato.temperatura).toFixed(1) + '°C';
-            tdHum.textContent = parseFloat(dato.humedad).toFixed(1) + '%';
-            tdNode.textContent = dato.nodeId;
-            tdFecha.textContent = dato.fecha_creacion;
+            tdId.textContent = dato.id ?? '-';
+
+            // Temperatura y humedad pueden no venir
+            if (dato.temperatura !== undefined && dato.temperatura !== null) {
+                const t = Number(dato.temperatura);
+                tdTemp.textContent = isNaN(t) ? '-' : t.toFixed(1) + '°C';
+            } else {
+                tdTemp.textContent = '-';
+            }
+
+            if (dato.humedad !== undefined && dato.humedad !== null) {
+                const h = Number(dato.humedad);
+                tdHum.textContent = isNaN(h) ? '-' : h.toFixed(1) + '%';
+            } else {
+                tdHum.textContent = '-';
+            }
+
+            tdNode.textContent = dato.nodeId ?? '-';
+            tdFecha.textContent = dato.fecha_creacion ?? '-';
 
             // Actualizar contador
             const totalEl = document.getElementById('total');
             const total = parseInt(totalEl.textContent.match(/\d+/)) || 0;
-            totalEl.textContent = 'Total de registros: ' + (total + 1);
+            totalEl.textContent = 'Total de registros: ' + (total + (alFrente ? 1 : 0));
 
             // Limitar a 100 filas
             while (tbody.rows.length > 100) {
