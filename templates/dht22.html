@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <title>Datos DHT22</title>
+    <title>Datos DHT22 - AgroLink</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="{{ url_for('static', filename='agrolink.png') }}" type="image/x-icon">
@@ -14,7 +14,7 @@
             <span>AgroLink</span>
         </a>
         <ul class="nav-links">
-            <li><a href="{{ url_for('ver_datos') }}">Tabla</a></li>
+            <li><a href="{{ url_for('ver_datos') }}">Tabla General</a></li>
             <li class="dropdown">
                 <span>Nodos</span>
                 <ul class="submenu">
@@ -28,80 +28,51 @@
         </ul>
     </nav>
 
+    <main class="main-content">
+        <div class="card">
+            <h1>Datos de Todos los Sensores</h1>
+            <div id="status" class="status-bar">Conectando al servidor WebSocket...</div>
+            <p id="total">Total de registros: {{ datos|length }}</p>
 
-    <div class="container">
-    <h1>Datos del Sensor DHT22</h1>
-    <div id="status" style="margin-bottom:10px;padding:8px;border-radius:4px;background:#f8f9fa;color:#333">Conectando al servidor WebSocket...</div>
-    <p id="total">Total de registros: {{ datos|length }}</p>
-
-    <table id="tabla-datos">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Temperatura (°C)</th>
-                <th>Humedad (%)</th>
-                <th>Nodo</th>
-                <th>Fecha</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for dato in datos %}
-            <tr>
-                <td>{{ dato.id }}</td>
-                <td class="temp">
-                    {% if dato.temperatura is not none %}
-                        {{ "%.1f"|format(dato.temperatura) }}°C
+            <table id="tabla-datos">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Temperatura (°C)</th>
+                        <th>Humedad (%)</th>
+                        <th>Nodo</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dato in datos %}
+                    <tr>
+                        <td>{{ dato.id }}</td>
+                        <td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-' }}°C</td>
+                        <td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}%</td>
+                        <td>{{ dato.nodeId or '-' }}</td>
+                        <td>{{ dato.fecha_creacion or '-' }}</td>
+                    </tr>
                     {% else %}
-                        -
-                    {% endif %}
-                </td>
-                <td class="hum">
-                    {% if dato.humedad is not none %}
-                        {{ "%.1f"|format(dato.humedad) }}%
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
-                <td>{{ dato.nodeId or '-' }}</td>
-                <td>{{ dato.fecha_creacion or '-' }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="5">No hay datos disponibles</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    </div>
-    <!-- Socket.IO client -->
+                    <tr>
+                        <td colspan="5">No hay datos disponibles</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+    
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
-        // Conectarse al servidor Socket.IO (misma origin). Usar solo polling para evitar errores en el servidor de desarrollo.
         const statusDiv = document.getElementById('status');
         const socket = io(window.location.origin, { transports: ['polling'] });
 
         socket.on('connect', () => {
             console.log('Conectado al servidor WebSocket', socket.id);
             statusDiv.textContent = 'Conectado al servidor WebSocket';
-            statusDiv.style.background = '#d4edda';
-            statusDiv.style.color = '#155724';
-        });
-
-        socket.on('datos_iniciales', (payload) => {
-            try {
-                console.log('Datos iniciales recibidos', payload);
-                if (payload && payload.datos && Array.isArray(payload.datos)) {
-                    // reemplazar tabla actual por los datos iniciales
-                    const tbody = document.querySelector('#tabla-datos tbody');
-                    tbody.innerHTML = '';
-                    payload.datos.forEach(d => agregarFilaDesdeObjeto(d, false));
-                    // actualizar contador
-                    const totalEl = document.getElementById('total');
-                    totalEl.textContent = 'Total de registros: ' + payload.datos.length;
-                }
-            } catch (e) {
-                console.error('Error procesando datos iniciales:', e);
-            }
+            statusDiv.style.background = '#d1e7dd';
+            statusDiv.style.color = '#0f5132';
         });
 
         socket.on('connect_error', (err) => {
@@ -111,13 +82,18 @@
             statusDiv.style.color = '#721c24';
         });
 
+        socket.on('disconnect', (reason) => {
+            console.warn('Desconectado:', reason);
+            statusDiv.textContent = 'Desconectado: ' + reason;
+            statusDiv.style.background = '#fff3cd';
+            statusDiv.style.color = '#856404';
+        });
+
         socket.on('reconnect_attempt', () => {
-            console.log('Intentando reconectar...');
             statusDiv.textContent = 'Intentando reconectar...';
         });
 
         socket.on('reconnect', (attempt) => {
-            console.log('Reconectado después de', attempt, 'intentos');
             statusDiv.textContent = 'Reconectado';
         });
 
@@ -131,50 +107,23 @@
             const nuevaFila = alFrente ? tbody.insertRow(0) : tbody.insertRow(-1);
             nuevaFila.className = 'nuevo';
 
-            const tdId = nuevaFila.insertCell(0);
-            const tdTemp = nuevaFila.insertCell(1);
-            const tdHum = nuevaFila.insertCell(2);
-            const tdNode = nuevaFila.insertCell(3);
-            const tdFecha = nuevaFila.insertCell(4);
+            nuevaFila.insertCell(0).textContent = dato.id ?? '-';
+            nuevaFila.insertCell(1).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? `${Number(dato.temperatura).toFixed(1)}°C` : '-';
+            nuevaFila.insertCell(2).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? `${Number(dato.humedad).toFixed(1)}%` : '-';
+            nuevaFila.insertCell(3).textContent = dato.nodeId ?? '-';
+            nuevaFila.insertCell(4).textContent = dato.fecha_creacion ?? '-';
 
-            tdId.textContent = dato.id ?? '-';
-
-            // Temperatura y humedad pueden no venir
-            if (dato.temperatura !== undefined && dato.temperatura !== null) {
-                const t = Number(dato.temperatura);
-                tdTemp.textContent = isNaN(t) ? '-' : t.toFixed(1) + '°C';
-            } else {
-                tdTemp.textContent = '-';
-            }
-
-            if (dato.humedad !== undefined && dato.humedad !== null) {
-                const h = Number(dato.humedad);
-                tdHum.textContent = isNaN(h) ? '-' : h.toFixed(1) + '%';
-            } else {
-                tdHum.textContent = '-';
-            }
-
-            tdNode.textContent = dato.nodeId ?? '-';
-            tdFecha.textContent = dato.fecha_creacion ?? '-';
-
-            // Actualizar contador
             const totalEl = document.getElementById('total');
-            const total = parseInt(totalEl.textContent.match(/\d+/)) || 0;
-            totalEl.textContent = 'Total de registros: ' + (total + (alFrente ? 1 : 0));
+            const totalText = totalEl.textContent.match(/\d+/);
+            const total = totalText ? parseInt(totalText[0]) : 0;
+            if (alFrente) {
+                totalEl.textContent = 'Total de registros: ' + (total + 1);
+            }
 
-            // Limitar a 100 filas
             while (tbody.rows.length > 100) {
                 tbody.deleteRow(tbody.rows.length - 1);
             }
         }
-
-        // Manejar desconexión
-        socket.on('disconnect', (reason) => {
-            console.warn('Desconectado:', reason);
-            statusDiv.textContent = 'Desconectado: ' + reason;
-            statusDiv.style.background = '#fff3cd';
-            statusDiv.style.color = '#856404';
-        });
     </script>
 </body>
 </html>

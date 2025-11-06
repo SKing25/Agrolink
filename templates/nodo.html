@@ -14,7 +14,7 @@
             <span>AgroLink</span>
         </a>
         <ul class="nav-links">
-            <li><a href="{{ url_for('ver_datos') }}">Tabla</a></li>
+            <li><a href="{{ url_for('ver_datos') }}">Tabla General</a></li>
             <li class="dropdown">
                 <span>Nodos</span>
                 <ul class="submenu">
@@ -28,58 +28,47 @@
         </ul>
     </nav>
 
-    <div class="container">
-        <h1>Datos del Nodo: <span style="color: #4CAF50;">{{ node_id }}</span></h1>
-        <div id="status" style="margin-bottom:10px;padding:8px;border-radius:4px;background:#f8f9fa;color:#333">Conectando al servidor WebSocket...</div>
+    <main class="main-content">
+        <div class="card">
+            <h1>Datos del Nodo: <span class="primary-text">{{ node_id }}</span></h1>
+            <div id="status" class="status-bar">Conectando al servidor WebSocket...</div>
+            
+            <div class="action-bar">
+                <div class="meta-info">
+                    <p id="total">Total de registros: {{ datos|length }}</p>
+                </div>
+                <button id="btn-refresh" class="btn">Recargar Datos</button>
+            </div>
 
-        <div style="margin-bottom: 16px;">
-            <p id="total">Total de registros: {{ datos|length }}</p>
-            <button id="btn-refresh" style="padding:8px 16px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">
-                Recargar últimos 100
-            </button>
+            <table id="tabla-datos">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Temperatura (°C)</th>
+                        <th>Humedad (%)</th>
+                        <th>Timestamp</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dato in datos %}
+                    <tr>
+                        <td>{{ dato.id }}</td>
+                        <td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-' }}°C</td>
+                        <td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}%</td>
+                        <td>{{ dato.timestamp or '-' }}</td>
+                        <td>{{ dato.fecha_creacion or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">No hay datos disponibles para este nodo</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
+    </main>
 
-        <table id="tabla-datos">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Temperatura (°C)</th>
-                    <th>Humedad (%)</th>
-                    <th>Timestamp</th>
-                    <th>Fecha</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for dato in datos %}
-                <tr>
-                    <td>{{ dato.id }}</td>
-                    <td class="temp">
-                        {% if dato.temperatura is not none %}
-                            {{ "%.1f"|format(dato.temperatura) }}°C
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td class="hum">
-                        {% if dato.humedad is not none %}
-                            {{ "%.1f"|format(dato.humedad) }}%
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>{{ dato.timestamp or '-' }}</td>
-                    <td>{{ dato.fecha_creacion or '-' }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5">No hay datos disponibles para este nodo</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Socket.IO client -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
         const NODE_ID = "{{ node_id }}";
@@ -87,15 +76,13 @@
         const totalEl = document.getElementById('total');
         const btnRefresh = document.getElementById('btn-refresh');
         const tbody = document.querySelector('#tabla-datos tbody');
-
-        // Conectar con polling para evitar errores en servidor de desarrollo
         const socket = io(window.location.origin, { transports: ['polling'] });
 
         socket.on('connect', () => {
             console.log('Conectado al servidor WebSocket', socket.id);
             statusDiv.textContent = 'Conectado - Escuchando datos del nodo ' + NODE_ID;
-            statusDiv.style.background = '#d4edda';
-            statusDiv.style.color = '#155724';
+            statusDiv.style.background = '#d1e7dd';
+            statusDiv.style.color = '#0f5132';
         });
 
         socket.on('connect_error', (err) => {
@@ -112,68 +99,55 @@
             statusDiv.style.color = '#856404';
         });
 
-        // Nuevo dato en tiempo real - filtrar por nodeId
         socket.on('nuevo_dato', (dato) => {
-            console.log('Nuevo dato recibido:', dato);
-
-            // Solo mostrar si corresponde a este nodo
             if (dato && dato.nodeId && String(dato.nodeId) === String(NODE_ID)) {
-                agregarFila(dato);
+                console.log('Nuevo dato para este nodo:', dato);
+                agregarFilaDesdeObjeto(dato, true);
             }
         });
+        
+        btnRefresh.addEventListener('click', () => {
+            statusDiv.textContent = 'Solicitando últimos 100 registros...';
+            statusDiv.style.background = '#fff3cd';
+            statusDiv.style.color = '#856404';
+            tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+            socket.emit('solicitar_datos', { limit: 100, offset: 0, nodeId: NODE_ID });
+        });
 
-        // Respuesta al solicitar datos históricos
         socket.on('resultado_datos', (payload) => {
             console.log('Datos históricos recibidos:', payload);
             if (payload && payload.datos && Array.isArray(payload.datos)) {
-                tbody.innerHTML = '';
-                payload.datos.forEach(d => agregarFilaDesdeObjeto(d, false));
-                totalEl.textContent = 'Total de registros: ' + tbody.children.length;
+                tbody.innerHTML = ''; // Limpiar la tabla
+                if (payload.datos.length === 0) {
+                     tbody.innerHTML = '<tr><td colspan="5">No hay datos disponibles para este nodo.</td></tr>';
+                } else {
+                    payload.datos.forEach(d => agregarFilaDesdeObjeto(d, false));
+                }
+                totalEl.textContent = 'Mostrando ' + tbody.children.length + ' registros';
                 statusDiv.textContent = 'Datos actualizados';
             }
         });
 
-        function agregarFila(dato) {
-            agregarFilaDesdeObjeto(dato, true);
-        }
-
         function agregarFilaDesdeObjeto(dato, alFrente = true) {
+            // Si la tabla dice que no hay datos, limpiarla primero
+            if(tbody.querySelector('td[colspan="5"]')) {
+                tbody.innerHTML = '';
+            }
+            
             const nuevaFila = alFrente ? tbody.insertRow(0) : tbody.insertRow(-1);
-            nuevaFila.className = 'nuevo';
-
-            const tdId = nuevaFila.insertCell(0);
-            const tdTemp = nuevaFila.insertCell(1);
-            const tdHum = nuevaFila.insertCell(2);
-            const tdTimestamp = nuevaFila.insertCell(3);
-            const tdFecha = nuevaFila.insertCell(4);
-
-            tdId.textContent = dato.id ?? '-';
-
-            // Temperatura
-            if (dato.temperatura !== undefined && dato.temperatura !== null) {
-                const t = Number(dato.temperatura);
-                tdTemp.textContent = isNaN(t) ? '-' : t.toFixed(1) + '°C';
-                tdTemp.className = 'temp';
-            } else {
-                tdTemp.textContent = '-';
+            if(alFrente) {
+                nuevaFila.className = 'nuevo';
             }
 
-            // Humedad
-            if (dato.humedad !== undefined && dato.humedad !== null) {
-                const h = Number(dato.humedad);
-                tdHum.textContent = isNaN(h) ? '-' : h.toFixed(1) + '%';
-                tdHum.className = 'hum';
-            } else {
-                tdHum.textContent = '-';
-            }
-
-            tdTimestamp.textContent = dato.timestamp ?? '-';
-            tdFecha.textContent = dato.fecha_creacion ?? '-';
-
-            // Actualizar contador si se añade al frente
+            nuevaFila.insertCell(0).textContent = dato.id ?? '-';
+            nuevaFila.insertCell(1).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? `${Number(dato.temperatura).toFixed(1)}°C` : '-';
+            nuevaFila.insertCell(2).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? `${Number(dato.humedad).toFixed(1)}%` : '-';
+            nuevaFila.insertCell(3).textContent = dato.timestamp ?? '-';
+            nuevaFila.insertCell(4).textContent = dato.fecha_creacion ?? '-';
+            
             if (alFrente) {
-                const total = parseInt(totalEl.textContent.match(/\d+/)) || 0;
-                totalEl.textContent = 'Total de registros: ' + (total + 1);
+                 const total = tbody.rows.length;
+                 totalEl.textContent = 'Mostrando ' + total + ' registros';
             }
 
             // Limitar a 100 filas en DOM
@@ -181,22 +155,6 @@
                 tbody.deleteRow(tbody.rows.length - 1);
             }
         }
-
-        // Botón para recargar datos
-        btnRefresh.addEventListener('click', () => {
-            statusDiv.textContent = 'Solicitando datos...';
-            statusDiv.style.background = '#fff3cd';
-            statusDiv.style.color = '#856404';
-            socket.emit('solicitar_datos', { limit: 100, offset: 0, nodeId: NODE_ID });
-        });
-
-        socket.on('error', (e) => {
-            console.error('Socket error:', e);
-            statusDiv.textContent = 'Error: ' + (e.mensaje || JSON.stringify(e));
-            statusDiv.style.background = '#f8d7da';
-            statusDiv.style.color = '#721c24';
-        });
     </script>
 </body>
 </html>
-
