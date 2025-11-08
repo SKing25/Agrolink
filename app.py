@@ -139,8 +139,8 @@ def recibir_datos():
         timestamp = data.get('timestamp')
 
         # Validar que venga al menos un dato de sensor
-        if all(v is None for v in [temperatura, humedad, soil_moisture, light, percentage]):
-            return jsonify({"status": "error", "mensaje": "No se recibió ningún dato de sensor"}), 400
+        #if all(v is None for v in [temperatura, humedad, soil_moisture, light, percentage]):
+        #    return jsonify({"status": "error", "mensaje": "No se recibió ningún dato de sensor"}), 400
 
         # Guardar en base de datos usando la función del módulo database
         nuevo_dato = guardar_dato_sensor(
