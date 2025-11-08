@@ -18,7 +18,7 @@ class DatosSensor(db.Model):
     humedad = db.Column(db.Float, nullable=True)
     soil_moisture = db.Column(db.Float, nullable=True)  # Humedad del suelo
     light = db.Column(db.Float, nullable=True)  # Nivel de luz
-    light_percentage = db.Column(db.Float, nullable=True)  # Porcentaje de luz
+    percentage = db.Column(db.Float, nullable=True)  # Porcentaje de luz
     nodeId = db.Column(db.String(50), nullable=True)
     timestamp = db.Column(db.Integer, nullable=True)
     fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -41,8 +41,8 @@ class DatosSensor(db.Model):
             resultado['soil_moisture'] = float(self.soil_moisture)
         if self.light is not None:
             resultado['light'] = float(self.light)
-        if self.light_percentage is not None:
-            resultado['percentage'] = float(self.light_percentage)
+        if self.percentage is not None:
+            resultado['percentage'] = float(self.percentage)
 
         return resultado
 
@@ -84,14 +84,14 @@ def guardar_dato_sensor(temperatura=None, humedad=None, soil_moisture=None, ligh
         hum_val = float(humedad) if humedad is not None else None
         soil_val = float(soil_moisture) if soil_moisture is not None else None
         light_val = float(light) if light is not None else None
-        light_perc_val = float(percentage) if percentage is not None else None
+        percentage = float(percentage) if percentage is not None else None
 
         nuevo_dato = DatosSensor(
             temperatura=temp_val,
             humedad=hum_val,
             soil_moisture=soil_val,
             light=light_val,
-            light_percentage=light_perc_val,
+            percentage=percentage,
             nodeId=node_id,
             timestamp=timestamp
         )
@@ -249,7 +249,7 @@ def obtener_campos_nodo(node_id):
         'humedad': False,
         'soil_moisture': False,
         'light': False,
-        'light_percentage': False
+        'percentage': False
     }
 
     # Verificar si algún registro tiene valores en cada campo
@@ -262,8 +262,8 @@ def obtener_campos_nodo(node_id):
             campos['soil_moisture'] = True
         if dato.light is not None:
             campos['light'] = True
-        if dato.light_percentage is not None:
-            campos['light_percentage'] = True
+        if dato.percentage is not None:
+            campos['percentage'] = True
 
     return campos
 
