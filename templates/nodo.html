@@ -44,8 +44,10 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Temperatura (°C)</th>
-                        <th>Humedad (%)</th>
+                        {% if campos.temperatura %}<th>Temp (°C)</th>{% endif %}
+                        {% if campos.humedad %}<th>Humedad (%)</th>{% endif %}
+                        {% if campos.soil_moisture %}<th>Hum. Suelo</th>{% endif %}
+                        {% if campos.light or campos.light_percentage %}<th>Luz(lux) - (%)</th>{% endif %}
                         <th>Timestamp</th>
                         <th>Fecha</th>
                     </tr>
@@ -54,14 +56,29 @@
                     {% for dato in datos %}
                     <tr>
                         <td>{{ dato.id }}</td>
-                        <td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-' }}°C</td>
-                        <td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}%</td>
+                        {% if campos.temperatura %}<td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-' }}</td>{% endif %}
+                        {% if campos.humedad %}<td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}</td>{% endif %}
+                        {% if campos.soil_moisture %}<td>{{ "%.0f"|format(dato.soil_moisture) if dato.soil_moisture is not none else '-' }}</td>{% endif %}
+                        {% if campos.light or campos.light_percentage %}
+                        <td>
+                            {% if dato.light is not none and dato.percentage is not none %}
+                                {{ "%.2f"|format(dato.light) }} - {{ "%.0f"|format(dato.percentage) }}%
+                            {% elif dato.light is not none %}
+                                {{ "%.2f"|format(dato.light) }}
+                            {% elif dato.percentage is not none %}
+                                {{ "%.0f"|format(dato.percentage) }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        {% endif %}
                         <td>{{ dato.timestamp or '-' }}</td>
                         <td>{{ dato.fecha_creacion or '-' }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5">No hay datos disponibles para este nodo</td>
+                        {% set num_columnas = 3 + (1 if campos.temperatura else 0) + (1 if campos.humedad else 0) + (1 if campos.soil_moisture else 0) + (1 if campos.light or campos.light_percentage else 0) %}
+                        <td colspan="{{ num_columnas }}">No hay datos disponibles para este nodo</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -72,6 +89,7 @@
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
         const NODE_ID = "{{ node_id }}";
+        const CAMPOS = {{ campos|tojson }};  // Campos que tiene este nodo
         const statusDiv = document.getElementById('status');
         const totalEl = document.getElementById('total');
         const btnRefresh = document.getElementById('btn-refresh');
@@ -106,11 +124,16 @@
             }
         });
         
+        // Calcular colspan dinámicamente
+        const numColumnas = 3 + (CAMPOS.temperatura ? 1 : 0) + (CAMPOS.humedad ? 1 : 0) +
+                            (CAMPOS.soil_moisture ? 1 : 0) +
+                            ((CAMPOS.light || CAMPOS.light_percentage) ? 1 : 0);
+
         btnRefresh.addEventListener('click', () => {
             statusDiv.textContent = 'Solicitando últimos 100 registros...';
             statusDiv.style.background = '#fff3cd';
             statusDiv.style.color = '#856404';
-            tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="${numColumnas}">Cargando...</td></tr>`;
             socket.emit('solicitar_datos', { limit: 100, offset: 0, nodeId: NODE_ID });
         });
 
@@ -119,7 +142,7 @@
             if (payload && payload.datos && Array.isArray(payload.datos)) {
                 tbody.innerHTML = ''; // Limpiar la tabla
                 if (payload.datos.length === 0) {
-                     tbody.innerHTML = '<tr><td colspan="5">No hay datos disponibles para este nodo.</td></tr>';
+                     tbody.innerHTML = `<tr><td colspan="${numColumnas}">No hay datos disponibles para este nodo.</td></tr>`;
                 } else {
                     payload.datos.forEach(d => agregarFilaDesdeObjeto(d, false));
                 }
@@ -130,7 +153,8 @@
 
         function agregarFilaDesdeObjeto(dato, alFrente = true) {
             // Si la tabla dice que no hay datos, limpiarla primero
-            if(tbody.querySelector('td[colspan="5"]')) {
+            const emptyRow = tbody.querySelector(`td[colspan]`);
+            if(emptyRow) {
                 tbody.innerHTML = '';
             }
             
@@ -139,12 +163,44 @@
                 nuevaFila.className = 'nuevo';
             }
 
-            nuevaFila.insertCell(0).textContent = dato.id ?? '-';
-            nuevaFila.insertCell(1).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? `${Number(dato.temperatura).toFixed(1)}°C` : '-';
-            nuevaFila.insertCell(2).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? `${Number(dato.humedad).toFixed(1)}%` : '-';
-            nuevaFila.insertCell(3).textContent = dato.timestamp ?? '-';
-            nuevaFila.insertCell(4).textContent = dato.fecha_creacion ?? '-';
-            
+            // ID (siempre presente)
+            nuevaFila.insertCell(-1).textContent = dato.id ?? '-';
+
+            // Temperatura (si el nodo la envía)
+            if (CAMPOS.temperatura) {
+                nuevaFila.insertCell(-1).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ?
+                    `${Number(dato.temperatura).toFixed(1)}` : '-';
+            }
+
+            // Humedad (si el nodo la envía)
+            if (CAMPOS.humedad) {
+                nuevaFila.insertCell(-1).textContent = (dato.humedad !== undefined && dato.humedad !== null) ?
+                    `${Number(dato.humedad).toFixed(1)}` : '-';
+            }
+
+            // Humedad del suelo (si el nodo la envía)
+            if (CAMPOS.soil_moisture) {
+                nuevaFila.insertCell(-1).textContent = (dato.soil_moisture !== undefined && dato.soil_moisture !== null) ?
+                    `${Number(dato.soil_moisture).toFixed(0)}` : '-';
+            }
+
+            // Luz (si el nodo la envía)
+            if (CAMPOS.light || CAMPOS.light_percentage) {
+                let luzTexto = '-';
+                if (dato.light !== undefined && dato.light !== null && dato.percentage !== undefined && dato.percentage !== null) {
+                    luzTexto = `${Number(dato.light).toFixed(2)} - ${Number(dato.percentage).toFixed(0)}%`;
+                } else if (dato.light !== undefined && dato.light !== null) {
+                    luzTexto = `${Number(dato.light).toFixed(2)}`;
+                } else if (dato.percentage !== undefined && dato.percentage !== null) {
+                    luzTexto = `${Number(dato.percentage).toFixed(0)}%`;
+                }
+                nuevaFila.insertCell(-1).textContent = luzTexto;
+            }
+
+            // Timestamp y Fecha (siempre presentes)
+            nuevaFila.insertCell(-1).textContent = dato.timestamp ?? '-';
+            nuevaFila.insertCell(-1).textContent = dato.fecha_creacion ?? '-';
+
             if (alFrente) {
                  const total = tbody.rows.length;
                  totalEl.textContent = 'Mostrando ' + total + ' registros';

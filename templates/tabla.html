@@ -38,9 +38,11 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Temperatura (°C)</th>
-                        <th>Humedad (%)</th>
                         <th>Nodo</th>
+                        <th>Temp (°C)</th>
+                        <th>Humedad (%)</th>
+                        <th>Hum. Suelo</th>
+                        <th>Luz(lux) - (%)</th>
                         <th>Fecha</th>
                     </tr>
                 </thead>
@@ -48,14 +50,26 @@
                     {% for dato in datos %}
                     <tr>
                         <td>{{ dato.id }}</td>
-                        <td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-' }}°C</td>
-                        <td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}%</td>
                         <td>{{ dato.nodeId or '-' }}</td>
+                        <td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-' }}</td>
+                        <td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}</td>
+                        <td>{{ "%.0f"|format(dato.soil_moisture) if dato.soil_moisture is not none else '-' }}</td>
+                        <td>
+                            {% if dato.light is not none and dato.percentage is not none %}
+                                {{ "%.2f"|format(dato.light) }} - {{ "%.0f"|format(dato.percentage) }}%
+                            {% elif dato.light is not none %}
+                                {{ "%.2f"|format(dato.light) }}
+                            {% elif dato.percentage is not none %}
+                                {{ "%.0f"|format(dato.percentage) }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td>{{ dato.fecha_creacion or '-' }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5">No hay datos disponibles</td>
+                        <td colspan="7">No hay datos disponibles</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -108,10 +122,22 @@
             nuevaFila.className = 'nuevo';
 
             nuevaFila.insertCell(0).textContent = dato.id ?? '-';
-            nuevaFila.insertCell(1).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? `${Number(dato.temperatura).toFixed(1)}°C` : '-';
-            nuevaFila.insertCell(2).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? `${Number(dato.humedad).toFixed(1)}%` : '-';
-            nuevaFila.insertCell(3).textContent = dato.nodeId ?? '-';
-            nuevaFila.insertCell(4).textContent = dato.fecha_creacion ?? '-';
+            nuevaFila.insertCell(1).textContent = dato.nodeId ?? '-';
+            nuevaFila.insertCell(2).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? `${Number(dato.temperatura).toFixed(1)}` : '-';
+            nuevaFila.insertCell(3).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? `${Number(dato.humedad).toFixed(1)}` : '-';
+            nuevaFila.insertCell(4).textContent = (dato.soil_moisture !== undefined && dato.soil_moisture !== null) ? `${Number(dato.soil_moisture).toFixed(0)}` : '-';
+
+            let luzTexto = '-';
+            if (dato.light !== undefined && dato.light !== null && dato.percentage !== undefined && dato.percentage !== null) {
+                luzTexto = `${Number(dato.light).toFixed(2)} - ${Number(dato.percentage).toFixed(0)}%`;
+            } else if (dato.light !== undefined && dato.light !== null) {
+                luzTexto = `${Number(dato.light).toFixed(2)}`;
+            } else if (dato.percentage !== undefined && dato.percentage !== null) {
+                luzTexto = `${Number(dato.percentage).toFixed(0)}%`;
+            }
+            nuevaFila.insertCell(5).textContent = luzTexto;
+
+            nuevaFila.insertCell(6).textContent = dato.fecha_creacion ?? '-';
 
             const totalEl = document.getElementById('total');
             const totalText = totalEl.textContent.match(/\d+/);

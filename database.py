@@ -12,24 +12,39 @@ db = SQLAlchemy()
 # ==================== MODELO DE DATOS ====================
 
 class DatosSensor(db.Model):
-    """Modelo para almacenar datos de sensores DHT22"""
+    """Modelo para almacenar datos de sensores"""
     id = db.Column(db.Integer, primary_key=True)
     temperatura = db.Column(db.Float, nullable=True)
     humedad = db.Column(db.Float, nullable=True)
+    soil_moisture = db.Column(db.Float, nullable=True)  # Humedad del suelo
+    light = db.Column(db.Float, nullable=True)  # Nivel de luz
+    light_percentage = db.Column(db.Float, nullable=True)  # Porcentaje de luz
     nodeId = db.Column(db.String(50), nullable=True)
     timestamp = db.Column(db.Integer, nullable=True)
     fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
         """Convierte el objeto a diccionario para serialización JSON"""
-        return {
+        resultado = {
             'id': self.id,
-            'temperatura': None if self.temperatura is None else float(self.temperatura),
-            'humedad': None if self.humedad is None else float(self.humedad),
             'nodeId': self.nodeId,
             'timestamp': self.timestamp,
             'fecha_creacion': self.fecha_creacion.strftime('%Y-%m-%d %H:%M:%S %Z')
         }
+
+        # Solo incluir campos con valores no None
+        if self.temperatura is not None:
+            resultado['temperatura'] = float(self.temperatura)
+        if self.humedad is not None:
+            resultado['humedad'] = float(self.humedad)
+        if self.soil_moisture is not None:
+            resultado['soil_moisture'] = float(self.soil_moisture)
+        if self.light is not None:
+            resultado['light'] = float(self.light)
+        if self.light_percentage is not None:
+            resultado['percentage'] = float(self.light_percentage)
+
+        return resultado
 
 
 # ==================== FUNCIONES DE ACCESO A DATOS ====================
@@ -41,13 +56,16 @@ def inicializar_db(app):
         db.create_all()
 
 
-def guardar_dato_sensor(temperatura, humedad, node_id='unknown', timestamp=None):
+def guardar_dato_sensor(temperatura=None, humedad=None, soil_moisture=None, light=None, percentage=None, node_id='unknown', timestamp=None):
     """
     Guarda un nuevo dato de sensor en la base de datos
     
     Args:
         temperatura: Temperatura en °C o None
         humedad: Humedad en % o None
+        soil_moisture: Humedad del suelo o None
+        light: Nivel de luz o None
+        percentage: Porcentaje luz o None
         node_id: ID del nodo sensor
         timestamp: Timestamp Unix (opcional)
     
@@ -64,10 +82,16 @@ def guardar_dato_sensor(temperatura, humedad, node_id='unknown', timestamp=None)
         # Convertir a float sólo si no es None
         temp_val = float(temperatura) if temperatura is not None else None
         hum_val = float(humedad) if humedad is not None else None
+        soil_val = float(soil_moisture) if soil_moisture is not None else None
+        light_val = float(light) if light is not None else None
+        light_perc_val = float(percentage) if percentage is not None else None
 
         nuevo_dato = DatosSensor(
             temperatura=temp_val,
             humedad=hum_val,
+            soil_moisture=soil_val,
+            light=light_val,
+            light_percentage=light_perc_val,
             nodeId=node_id,
             timestamp=timestamp
         )
@@ -205,6 +229,43 @@ def obtener_nodos_unicos():
         list: Lista de strings con IDs de nodos
     """
     return [row[0] for row in db.session.query(DatosSensor.nodeId).distinct().order_by(DatosSensor.nodeId.asc()).all() if row[0]]
+
+
+def obtener_campos_nodo(node_id):
+    """
+    Detecta qué campos de sensores tiene datos un nodo específico
+
+    Args:
+        node_id: ID del nodo a analizar
+
+    Returns:
+        dict: Diccionario con campos como claves y True si tiene datos
+    """
+    # Obtener algunos registros recientes del nodo
+    datos = DatosSensor.query.filter_by(nodeId=node_id).order_by(DatosSensor.fecha_creacion.desc()).limit(10).all()
+
+    campos = {
+        'temperatura': False,
+        'humedad': False,
+        'soil_moisture': False,
+        'light': False,
+        'light_percentage': False
+    }
+
+    # Verificar si algún registro tiene valores en cada campo
+    for dato in datos:
+        if dato.temperatura is not None:
+            campos['temperatura'] = True
+        if dato.humedad is not None:
+            campos['humedad'] = True
+        if dato.soil_moisture is not None:
+            campos['soil_moisture'] = True
+        if dato.light is not None:
+            campos['light'] = True
+        if dato.light_percentage is not None:
+            campos['light_percentage'] = True
+
+    return campos
 
 
 def eliminar_dato(dato_id):

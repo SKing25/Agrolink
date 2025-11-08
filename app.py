@@ -11,6 +11,7 @@ from database import (
     contar_registros,
     obtener_ultimo_dato,
     obtener_nodos_unicos,
+    obtener_campos_nodo,
     eliminar_dato
 )
 import folium
@@ -62,13 +63,15 @@ def ver_por_nodo(node_id: str):
         dato = obtener_ultimo_dato(node_id=node_id)
         total_registros = contar_registros(node_id=node_id)
         nodos = obtener_nodos_unicos()
+        campos = obtener_campos_nodo(node_id)  # Detectar qué campos tiene este nodo
 
         return render_template('nodo.html',
                                node_id=node_id,
                                datos=datos,
                                total_registros=total_registros,
                                ultimo_dato=dato,
-                               nodos=nodos
+                               nodos=nodos,
+                               campos=campos
                                )
     except Exception as e:
         return f"Error: {e}", 500
@@ -80,7 +83,7 @@ def ver_datos():
         # Enviar los últimos 100 datos y la lista de nodos al template para que pueda renderizar y recibir actualizaciones
         datos = obtener_todos_datos(limit=100)
         nodos = obtener_nodos_unicos()
-        return render_template('dht22.html', datos=datos, nodos=nodos)
+        return render_template('tabla.html', datos=datos, nodos=nodos)
     except Exception as e:
         return f"Error: {e}", 500
 
@@ -96,7 +99,7 @@ def recibir_datos():
         if not data:
             return jsonify({"status": "error", "mensaje": "No se recibió JSON"}), 400
 
-        # Aceptar temperatura y/o humedad opcionales
+        # Normalizar nombres de campos - temperatura
         if 'temperatura' not in data:
             for alt in ('temperature', 'temp', 't'):
                 if alt in data:
@@ -106,6 +109,7 @@ def recibir_datos():
                         data.setdefault('temperatura', data.pop(alt))
                     break
 
+        # Normalizar humedad (aire)
         if 'humedad' not in data:
             for alt in ('humidity', 'hum', 'h'):
                 if alt in data:
@@ -115,19 +119,36 @@ def recibir_datos():
                         data.setdefault('humedad', data.pop(alt))
                     break
 
+        # Normalizar luz
+        if 'light' not in data:
+            for alt in ('luz', 'lux', 'l'):
+                if alt in data:
+                    try:
+                        data['light'] = float(data.pop(alt))
+                    except Exception:
+                        data.setdefault('light', data.pop(alt))
+                    break
+
+        # Extraer todos los valores posibles
         temperatura = data.get('temperatura')
         humedad = data.get('humedad')
+        soil_moisture = data.get('soil_moisture')
+        light = data.get('light')
+        percentage = data.get('percentage')
         node_id = data.get('nodeId') or data.get('node_id') or 'unknown'
         timestamp = data.get('timestamp')
 
-        # Validar que venga al menos uno
-        if temperatura is None and humedad is None:
-            return jsonify({"status": "error", "mensaje": "Falta temperatura y humedad"}), 400
+        # Validar que venga al menos un dato de sensor
+        if all(v is None for v in [temperatura, humedad, soil_moisture, light, percentage]):
+            return jsonify({"status": "error", "mensaje": "No se recibió ningún dato de sensor"}), 400
 
         # Guardar en base de datos usando la función del módulo database
         nuevo_dato = guardar_dato_sensor(
             temperatura=temperatura,
             humedad=humedad,
+            soil_moisture=soil_moisture,
+            light=light,
+            percentage=percentage,
             node_id=node_id,
             timestamp=timestamp
         )
@@ -137,10 +158,8 @@ def recibir_datos():
         # Emitir evento en tiempo real a todos los clientes conectados
         try:
             payload = nuevo_dato.to_dict()
-            # Filtrar claves con valor None (no enviar temperatura/humedad si no vinieron)
-            payload_filtrado = {k: v for k, v in payload.items() if not (k in ('temperatura','humedad') and v is None)}
-            # Emitir a todos los clientes conectados (sin usar parámetro 'broadcast' para compatibilidad)
-            socketio.emit('nuevo_dato', payload_filtrado)
+            # Emitir a todos los clientes conectados
+            socketio.emit('nuevo_dato', payload)
         except Exception as _e:
             print(f"Advertencia: no se pudo emitir por SocketIO: {_e}")
 
