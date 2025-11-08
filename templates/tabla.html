@@ -121,11 +121,12 @@
             const nuevaFila = alFrente ? tbody.insertRow(0) : tbody.insertRow(-1);
             nuevaFila.className = 'nuevo';
 
-            nuevaFila.insertCell(0).textContent = dato.id ?? '-';
-            nuevaFila.insertCell(1).textContent = dato.nodeId ?? '-';
-            nuevaFila.insertCell(2).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? `${Number(dato.temperatura).toFixed(1)}` : '-';
-            nuevaFila.insertCell(3).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? `${Number(dato.humedad).toFixed(1)}` : '-';
-            nuevaFila.insertCell(4).textContent = (dato.soil_moisture !== undefined && dato.soil_moisture !== null) ? `${Number(dato.soil_moisture).toFixed(0)}` : '-';
+            // Usar -1 para insertar al final de la fila en orden
+            nuevaFila.insertCell(-1).textContent = dato.id ?? '-';
+            nuevaFila.insertCell(-1).textContent = dato.nodeId ?? '-';
+            nuevaFila.insertCell(-1).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? `${Number(dato.temperatura).toFixed(1)}` : '-';
+            nuevaFila.insertCell(-1).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? `${Number(dato.humedad).toFixed(1)}` : '-';
+            nuevaFila.insertCell(-1).textContent = (dato.soil_moisture !== undefined && dato.soil_moisture !== null) ? `${Number(dato.soil_moisture).toFixed(0)}` : '-';
 
             let luzTexto = '-';
             if (dato.light !== undefined && dato.light !== null && dato.percentage !== undefined && dato.percentage !== null) {
@@ -135,9 +136,9 @@
             } else if (dato.percentage !== undefined && dato.percentage !== null) {
                 luzTexto = `${Number(dato.percentage).toFixed(0)}%`;
             }
-            nuevaFila.insertCell(5).textContent = luzTexto;
+            nuevaFila.insertCell(-1).textContent = luzTexto;
 
-            nuevaFila.insertCell(6).textContent = dato.fecha_creacion ?? '-';
+            nuevaFila.insertCell(-1).textContent = dato.fecha_creacion ?? '-';
 
             const totalEl = document.getElementById('total');
             const totalText = totalEl.textContent.match(/\d+/);
