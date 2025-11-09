@@ -40,6 +40,37 @@
                 <button id="btn-refresh" class="btn">Recargar Datos</button>
             </div>
 
+            <!-- Sección de Gráficas -->
+            <div class="charts-container">
+                {% if campos.temperatura %}
+                <div class="chart-card">
+                    <h3>Temperatura (°C)</h3>
+                    <canvas id="chartTemperatura"></canvas>
+                </div>
+                {% endif %}
+
+                {% if campos.humedad %}
+                <div class="chart-card">
+                    <h3>Humedad (%)</h3>
+                    <canvas id="chartHumedad"></canvas>
+                </div>
+                {% endif %}
+
+                {% if campos.soil_moisture %}
+                <div class="chart-card">
+                    <h3>Humedad del Suelo</h3>
+                    <canvas id="chartSoilMoisture"></canvas>
+                </div>
+                {% endif %}
+
+                {% if campos.light or campos.light_percentage %}
+                <div class="chart-card">
+                    <h3>Luz (lux)</h3>
+                    <canvas id="chartLight"></canvas>
+                </div>
+                {% endif %}
+            </div>
+
             <table id="tabla-datos">
                 <thead>
                     <tr>
@@ -87,6 +118,7 @@
     </main>
 
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
         const NODE_ID = "{{ node_id }}";
         const CAMPOS = {{ campos|tojson }};  // Campos que tiene este nodo
@@ -95,6 +127,166 @@
         const btnRefresh = document.getElementById('btn-refresh');
         const tbody = document.querySelector('#tabla-datos tbody');
         const socket = io(window.location.origin, { transports: ['polling'] });
+
+        // ==================== CONFIGURACIÓN DE GRÁFICAS ====================
+        const MAX_DATOS_GRAFICA = 30; // Mostrar últimos 30 puntos en la gráfica
+
+        const chartConfig = {
+            type: 'line',
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Tiempo'
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    },
+                    y: {
+                        display: true,
+                        beginAtZero: false
+                    }
+                },
+                animation: {
+                    duration: 750
+                }
+            }
+        };
+
+        // Inicializar gráficas
+        let chartTemperatura, chartHumedad, chartSoilMoisture, chartLight;
+
+        if (CAMPOS.temperatura) {
+            chartTemperatura = new Chart(document.getElementById('chartTemperatura'), {
+                ...chartConfig,
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Temperatura (°C)',
+                        data: [],
+                        borderColor: '#73c6b6',
+                        backgroundColor: 'rgba(115, 198, 182, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                }
+            });
+        }
+
+        if (CAMPOS.humedad) {
+            chartHumedad = new Chart(document.getElementById('chartHumedad'), {
+                ...chartConfig,
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Humedad (%)',
+                        data: [],
+                        borderColor: '#85c1e9',
+                        backgroundColor: 'rgba(133, 193, 233, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                }
+            });
+        }
+
+        if (CAMPOS.soil_moisture) {
+            chartSoilMoisture = new Chart(document.getElementById('chartSoilMoisture'), {
+                ...chartConfig,
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Humedad del Suelo',
+                        data: [],
+                        borderColor: '#8B4513',
+                        backgroundColor: 'rgba(139, 69, 19, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                }
+            });
+        }
+
+        if (CAMPOS.light || CAMPOS.light_percentage) {
+            chartLight = new Chart(document.getElementById('chartLight'), {
+                ...chartConfig,
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Luz (lux)',
+                        data: [],
+                        borderColor: '#FFD700',
+                        backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                }
+            });
+        }
+
+        // Función para actualizar gráficas con nuevos datos
+        function actualizarGraficas(datos) {
+            // Ordenar datos por fecha (más antiguos primero)
+            datos.sort((a, b) => {
+                const dateA = new Date(a.fecha_creacion);
+                const dateB = new Date(b.fecha_creacion);
+                return dateA - dateB;
+            });
+
+            // Tomar solo los últimos MAX_DATOS_GRAFICA
+            const datosRecientes = datos.slice(-MAX_DATOS_GRAFICA);
+
+            // Extraer labels (fechas formateadas)
+            const labels = datosRecientes.map(d => {
+                const fecha = new Date(d.fecha_creacion);
+                return fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            });
+
+            // Actualizar gráfica de temperatura
+            if (chartTemperatura && CAMPOS.temperatura) {
+                chartTemperatura.data.labels = labels;
+                chartTemperatura.data.datasets[0].data = datosRecientes.map(d => d.temperatura);
+                chartTemperatura.update('none');
+            }
+
+            // Actualizar gráfica de humedad
+            if (chartHumedad && CAMPOS.humedad) {
+                chartHumedad.data.labels = labels;
+                chartHumedad.data.datasets[0].data = datosRecientes.map(d => d.humedad);
+                chartHumedad.update('none');
+            }
+
+            // Actualizar gráfica de humedad del suelo
+            if (chartSoilMoisture && CAMPOS.soil_moisture) {
+                chartSoilMoisture.data.labels = labels;
+                chartSoilMoisture.data.datasets[0].data = datosRecientes.map(d => d.soil_moisture);
+                chartSoilMoisture.update('none');
+            }
+
+            // Actualizar gráfica de luz
+            if (chartLight && (CAMPOS.light || CAMPOS.light_percentage)) {
+                chartLight.data.labels = labels;
+                chartLight.data.datasets[0].data = datosRecientes.map(d => d.light);
+                chartLight.update('none');
+            }
+        }
+
+        // Cargar datos iniciales en las gráficas
+        const datosIniciales = {{ datos_json | tojson }};
+        if (datosIniciales && datosIniciales.length > 0) {
+            actualizarGraficas(datosIniciales);
+        }
 
         socket.on('connect', () => {
             console.log('Conectado al servidor WebSocket', socket.id);
@@ -121,9 +313,67 @@
             if (dato && dato.nodeId && String(dato.nodeId) === String(NODE_ID)) {
                 console.log('Nuevo dato para este nodo:', dato);
                 agregarFilaDesdeObjeto(dato, true);
+
+                // Actualizar gráficas con el nuevo dato
+                agregarDatoAGraficas(dato);
             }
         });
-        
+
+        // Función para agregar un nuevo dato a las gráficas
+        function agregarDatoAGraficas(dato) {
+            const fecha = new Date(dato.fecha_creacion);
+            const label = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+            // Agregar a gráfica de temperatura
+            if (chartTemperatura && dato.temperatura !== undefined && dato.temperatura !== null) {
+                chartTemperatura.data.labels.push(label);
+                chartTemperatura.data.datasets[0].data.push(dato.temperatura);
+
+                // Mantener solo MAX_DATOS_GRAFICA puntos
+                if (chartTemperatura.data.labels.length > MAX_DATOS_GRAFICA) {
+                    chartTemperatura.data.labels.shift();
+                    chartTemperatura.data.datasets[0].data.shift();
+                }
+                chartTemperatura.update();
+            }
+
+            // Agregar a gráfica de humedad
+            if (chartHumedad && dato.humedad !== undefined && dato.humedad !== null) {
+                chartHumedad.data.labels.push(label);
+                chartHumedad.data.datasets[0].data.push(dato.humedad);
+
+                if (chartHumedad.data.labels.length > MAX_DATOS_GRAFICA) {
+                    chartHumedad.data.labels.shift();
+                    chartHumedad.data.datasets[0].data.shift();
+                }
+                chartHumedad.update();
+            }
+
+            // Agregar a gráfica de humedad del suelo
+            if (chartSoilMoisture && dato.soil_moisture !== undefined && dato.soil_moisture !== null) {
+                chartSoilMoisture.data.labels.push(label);
+                chartSoilMoisture.data.datasets[0].data.push(dato.soil_moisture);
+
+                if (chartSoilMoisture.data.labels.length > MAX_DATOS_GRAFICA) {
+                    chartSoilMoisture.data.labels.shift();
+                    chartSoilMoisture.data.datasets[0].data.shift();
+                }
+                chartSoilMoisture.update();
+            }
+
+            // Agregar a gráfica de luz
+            if (chartLight && dato.light !== undefined && dato.light !== null) {
+                chartLight.data.labels.push(label);
+                chartLight.data.datasets[0].data.push(dato.light);
+
+                if (chartLight.data.labels.length > MAX_DATOS_GRAFICA) {
+                    chartLight.data.labels.shift();
+                    chartLight.data.datasets[0].data.shift();
+                }
+                chartLight.update();
+            }
+        }
+
         // Calcular colspan dinámicamente
         const numColumnas = 3 + (CAMPOS.temperatura ? 1 : 0) + (CAMPOS.humedad ? 1 : 0) + 
                             (CAMPOS.soil_moisture ? 1 : 0) + 
@@ -145,6 +395,9 @@
                      tbody.innerHTML = `<tr><td colspan="${numColumnas}">No hay datos disponibles para este nodo.</td></tr>`;
                 } else {
                     payload.datos.forEach(d => agregarFilaDesdeObjeto(d, false));
+
+                    // Actualizar gráficas con los datos históricos
+                    actualizarGraficas(payload.datos);
                 }
                 totalEl.textContent = 'Mostrando ' + tbody.children.length + ' registros';
                 statusDiv.textContent = 'Datos actualizados';

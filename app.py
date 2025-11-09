@@ -65,9 +65,13 @@ def ver_por_nodo(node_id: str):
         nodos = obtener_nodos_unicos()
         campos = obtener_campos_nodo(node_id)  # Detectar qué campos tiene este nodo
 
+        # Convertir datos a diccionarios para serialización JSON
+        datos_dict = [d.to_dict() for d in datos]
+
         return render_template('nodo.html',
                                node_id=node_id,
                                datos=datos,
+                               datos_json=datos_dict,
                                total_registros=total_registros,
                                ultimo_dato=dato,
                                nodos=nodos,

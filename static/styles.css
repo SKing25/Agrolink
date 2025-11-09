@@ -351,6 +351,44 @@ tr:hover td {
     border-left: 4px solid var(--primary-color);
 }
 
+/* --- Gráficas --- */
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 24px;
+    margin-bottom: 30px;
+}
+
+@media (max-width: 768px) {
+    .charts-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.chart-card {
+    background: var(--surface-color);
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+}
+
+.chart-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+}
+
+.chart-card h3 {
+    margin: 0 0 16px 0;
+    color: var(--text-color);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.chart-card canvas {
+    max-height: 250px;
+}
+
 #total, .meta-info p {
     color: var(--text-light);
     font-weight: 500;
