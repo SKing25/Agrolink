@@ -129,6 +129,16 @@ def recibir_datos():
                         data.setdefault('light', data.pop(alt))
                     break
 
+        # Normalizar porcentaje de luz
+        if 'percentage' not in data:
+            for alt in ('luz_porcentaje', 'light_percentage', 'porcentaje', 'pct'):
+                if alt in data:
+                    try:
+                        data['percentage'] = float(data.pop(alt))
+                    except Exception:
+                        data.setdefault('percentage', data.pop(alt))
+                    break
+
         # Extraer todos los valores posibles
         temperatura = data.get('temperatura')
         humedad = data.get('humedad')

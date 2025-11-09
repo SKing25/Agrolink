@@ -125,8 +125,8 @@
         });
         
         // Calcular colspan dinámicamente
-        const numColumnas = 3 + (CAMPOS.temperatura ? 1 : 0) + (CAMPOS.humedad ? 1 : 0) +
-                            (CAMPOS.soil_moisture ? 1 : 0) +
+        const numColumnas = 3 + (CAMPOS.temperatura ? 1 : 0) + (CAMPOS.humedad ? 1 : 0) + 
+                            (CAMPOS.soil_moisture ? 1 : 0) + 
                             ((CAMPOS.light || CAMPOS.light_percentage) ? 1 : 0);
 
         btnRefresh.addEventListener('click', () => {
@@ -165,25 +165,25 @@
 
             // ID (siempre presente)
             nuevaFila.insertCell(-1).textContent = dato.id ?? '-';
-
+            
             // Temperatura (si el nodo la envía)
             if (CAMPOS.temperatura) {
-                nuevaFila.insertCell(-1).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ?
+                nuevaFila.insertCell(-1).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? 
                     `${Number(dato.temperatura).toFixed(1)}` : '-';
             }
-
+            
             // Humedad (si el nodo la envía)
             if (CAMPOS.humedad) {
-                nuevaFila.insertCell(-1).textContent = (dato.humedad !== undefined && dato.humedad !== null) ?
+                nuevaFila.insertCell(-1).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? 
                     `${Number(dato.humedad).toFixed(1)}` : '-';
             }
-
+            
             // Humedad del suelo (si el nodo la envía)
             if (CAMPOS.soil_moisture) {
-                nuevaFila.insertCell(-1).textContent = (dato.soil_moisture !== undefined && dato.soil_moisture !== null) ?
+                nuevaFila.insertCell(-1).textContent = (dato.soil_moisture !== undefined && dato.soil_moisture !== null) ? 
                     `${Number(dato.soil_moisture).toFixed(0)}` : '-';
             }
-
+            
             // Luz (si el nodo la envía)
             if (CAMPOS.light || CAMPOS.light_percentage) {
                 let luzTexto = '-';
@@ -196,7 +196,7 @@
                 }
                 nuevaFila.insertCell(-1).textContent = luzTexto;
             }
-
+            
             // Timestamp y Fecha (siempre presentes)
             nuevaFila.insertCell(-1).textContent = dato.timestamp ?? '-';
             nuevaFila.insertCell(-1).textContent = dato.fecha_creacion ?? '-';
