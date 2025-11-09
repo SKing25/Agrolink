@@ -1,7 +1,7 @@
 import paho.mqtt.client as mqtt
+import time
 import requests
 import json
-import re
 
 BROKER = "localhost"   
 PORT = 1883
@@ -9,26 +9,7 @@ TOPIC = "dht22/datos/+"
 
 SERVER_URL = "https://agrolink.app/datos"
 
-def parse_message(payload):
-    try:
-        data = json.loads(payload)
-        if "temperature" in data and "humidity" in data:
-            return {
-                "temperatura": data["temperature"],
-                "humedad": data["humidity"]
-            }
-        return data
-    except json.JSONDecodeError:
-        try:
-            match = re.search(r"Temp:([-+]?\d+\.\d+)C Hum:([-+]?\d+\.\d+)%", payload)
-            if match:
-                temp = float(match.group(1))
-                hum = float(match.group(2))
-                return {"temperatura": temp, "humedad": hum}
-        except Exception as e:
-            print(f"Error parseando string: {e}")
-        
-        return {"mensaje": payload}
+node_cache = {}
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
@@ -44,28 +25,59 @@ def on_message(client, userdata, msg):
         payload = msg.payload.decode("utf-8")
         print(f"Mensaje de {topic}: {payload}")
 
-        # Parsear el mensaje (JSON o string)
-        data = parse_message(payload)
-        
-        # Agregar información adicional
+        data = json.loads(payload)
         node_id = topic.split("/")[-1] if "/" in topic else "unknown"
-        data["nodeId"] = node_id
-        data["timestamp"] = int(time.time())
+        
+        # Inicializar cache del nodo si no existe
+        if node_id not in node_cache:
+            node_cache[node_id] = {}
+        
+        # Guardar cada tipo de dato en el cache (acepta español e inglés)
+        if "temperature" in data or "temperatura" in data:
+            temp = data.get("temperature") or data.get("temperatura")
+            node_cache[node_id]["temperatura"] = temp
+            print(f"Temperatura: {temp}°C")
+        
+        if "humidity" in data or "humedad" in data:
+            hum = data.get("humidity") or data.get("humedad")
+            node_cache[node_id]["humedad"] = hum
+            print(f"Humedad aire: {hum}%")
+        
+        if "light" in data:
+            node_cache[node_id]["luz"] = data["light"]
+            print(f"Luz: {data['light']} lux")
+        
+        if "percentage" in data and "light" in data:
+            node_cache[node_id]["luz_porcentaje"] = data["percentage"]
+            print(f"Luz %: {data['percentage']}%")
+        
+        if "soil_moisture" in data or "humedad_suelo" in data:
+            node_cache[node_id]["soil_moisture"] = data["soil_moisture"]
+            print(f"soil_moisture: {data['soil_moisture']}%")
+        
+        # Preparar datos para enviar
+        complete_data = {
+            "nodeId": node_id,
+            "timestamp": int(time.time())
+        }
+        
+        # Agregar todos los datos del cache del nodo
+        complete_data.update(node_cache[node_id])
+        
+        print(f"Enviando al servidor: {complete_data}")
 
-        print(f"Datos parseados: {data}")
-
-        # Enviar a servidor Flask
-        response = requests.post(SERVER_URL, json=data, timeout=10)
+        # Enviar a servidor
+        response = requests.post(SERVER_URL, json=complete_data, timeout=10)
         if response.status_code == 200:
-            print("Datos enviados al servidor Render")
+            print("Datos enviados al servidor exitosamente\n")
         else:
-            print(f"Error al enviar: {response.status_code} - {response.text}")
+            print(f"Error al enviar: {response.status_code} - {response.text}\n")
 
+    except json.JSONDecodeError as e:
+        print(f"Error parseando JSON: {e}")
+        print(f"Payload recibido: {payload}\n")
     except Exception as e:
-        print(f"Error procesando mensaje: {e}")
-
-# Importar time para timestamp
-import time
+        print(f"Error procesando mensaje: {e}\n")
 
 # Configuración del cliente MQTT
 client = mqtt.Client()
@@ -76,7 +88,6 @@ print("Iniciando puente MQTT -> Servidor")
 print(f"Broker: {BROKER}:{PORT}")
 print(f"Servidor: {SERVER_URL}")
 
-# Conexión al broker
 try:
     client.connect(BROKER, PORT, 60)
     print("Iniciando loop...")
