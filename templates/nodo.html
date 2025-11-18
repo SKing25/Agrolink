@@ -1,469 +1,231 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nodo {{ node_id }} - AgroLink</title>
-    <link rel="icon" href="{{ url_for('static', filename='agrolink.png') }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nodo {{ node_id }} - AgroLink</title>
+  <link rel="icon" href="{{ url_for('static', filename='agrolink.png') }}" type="image/x-icon">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
+
 <body>
-    <nav class="navbar">
-        <a href="{{ url_for('home') }}" class="brand" title="Inicio">
-            <img src="{{ url_for('static', filename='agrolink.png') }}" alt="AgroLink" />
-            <span>AgroLink</span>
-        </a>
-        <ul class="nav-links">
-            <li><a href="{{ url_for('ver_datos') }}">Tabla General</a></li>
-            <li class="dropdown">
-                <span>Nodos</span>
-                <ul class="submenu">
-                    {% for node in nodos %}
-                    <li><a href="{{ url_for('ver_por_nodo', node_id=node) }}">{{ node }}</a></li>
-                    {% else %}
-                    <li><span>Sin nodos</span></li>
-                    {% endfor %}
-                </ul>
-            </li>
+  <nav class="navbar">
+    <a href="{{ url_for('home') }}" class="brand" title="Inicio">
+      <img src="{{ url_for('static', filename='agrolink.png') }}" alt="AgroLink" />
+      <span>AgroLink</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="{{ url_for('ver_datos') }}">Tabla General</a></li>
+      <li class="dropdown">
+        <span>Nodos</span>
+        <ul class="submenu">
+          {% for node in nodos %}
+          <li><a href="{{ url_for('ver_por_nodo', node_id=node) }}">{{ node }}</a></li>
+          {% else %}
+          <li><span>Sin nodos</span></li>
+          {% endfor %}
         </ul>
-    </nav>
+      </li>
+    </ul>
 
-    <main class="main-content">
-        <div class="card">
-            <h1>Datos del Nodo: <span class="primary-text">{{ node_id }}</span></h1>
-            <div id="status" class="status-bar">Conectando al servidor WebSocket...</div>
-            
-            <div class="action-bar">
-                <div class="meta-info">
-                    <p id="total">Total de registros: {{ datos|length }}</p>
-                </div>
-                <button id="btn-refresh" class="btn">Recargar Datos</button>
-            </div>
+    <!-- Toggle de tema -->
+    <!-- Toggle de tema - Versión simplificada -->
+    <div class="theme-toggle">
+      <button class="theme-switch" id="themeSwitch" aria-label="Cambiar tema">
+        <span class="icon icon-sun" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="4" fill="currentColor" />
+            <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="M4.22 4.22l1.42 1.42" />
+              <path d="M18.36 18.36l1.42 1.42" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="M4.22 19.78l1.42-1.42" />
+              <path d="M18.36 5.64l1.42-1.42" />
+            </g>
+          </svg>
+        </span>
+        <span class="icon icon-moon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M21 12.79A9 9 0 116.21 3 7 7 0 0021 12.79z" fill="currentColor" />
+          </svg>
+        </span>
+        <span class="knob" aria-hidden="true"></span>
+      </button>
+    </div>
+  </nav>
 
-            <!-- Sección de Gráficas -->
-            <div class="charts-container">
-                {% if campos.temperatura %}
-                <div class="chart-card">
-                    <h3>Temperatura (°C)</h3>
-                    <canvas id="chartTemperatura"></canvas>
-                </div>
-                {% endif %}
+  <main class="main-content">
+    <div class="card">
+      <h1>Datos del Nodo: <span class="primary-text">{{ node_id }}</span></h1>
+      <div id="status" class="status-bar">Conectando al servidor WebSocket...</div>
 
-                {% if campos.humedad %}
-                <div class="chart-card">
-                    <h3>Humedad (%)</h3>
-                    <canvas id="chartHumedad"></canvas>
-                </div>
-                {% endif %}
-
-                {% if campos.soil_moisture %}
-                <div class="chart-card">
-                    <h3>Humedad del Suelo</h3>
-                    <canvas id="chartSoilMoisture"></canvas>
-                </div>
-                {% endif %}
-
-                {% if campos.light or campos.light_percentage %}
-                <div class="chart-card">
-                    <h3>Luz (lux)</h3>
-                    <canvas id="chartLight"></canvas>
-                </div>
-                {% endif %}
-            </div>
-
-            <table id="tabla-datos">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        {% if campos.temperatura %}<th>Temp (°C)</th>{% endif %}
-                        {% if campos.humedad %}<th>Humedad (%)</th>{% endif %}
-                        {% if campos.soil_moisture %}<th>Hum. Suelo</th>{% endif %}
-                        {% if campos.light or campos.light_percentage %}<th>Luz(lux) - (%)</th>{% endif %}
-                        <th>Timestamp</th>
-                        <th>Fecha</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for dato in datos %}
-                    <tr>
-                        <td>{{ dato.id }}</td>
-                        {% if campos.temperatura %}<td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-' }}</td>{% endif %}
-                        {% if campos.humedad %}<td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}</td>{% endif %}
-                        {% if campos.soil_moisture %}<td>{{ "%.0f"|format(dato.soil_moisture) if dato.soil_moisture is not none else '-' }}</td>{% endif %}
-                        {% if campos.light or campos.light_percentage %}
-                        <td>
-                            {% if dato.light is not none and dato.percentage is not none %}
-                                {{ "%.2f"|format(dato.light) }} - {{ "%.0f"|format(dato.percentage) }}%
-                            {% elif dato.light is not none %}
-                                {{ "%.2f"|format(dato.light) }}
-                            {% elif dato.percentage is not none %}
-                                {{ "%.0f"|format(dato.percentage) }}%
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        {% endif %}
-                        <td>{{ dato.timestamp or '-' }}</td>
-                        <td>{{ dato.fecha_creacion or '-' }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        {% set num_columnas = 3 + (1 if campos.temperatura else 0) + (1 if campos.humedad else 0) + (1 if campos.soil_moisture else 0) + (1 if campos.light or campos.light_percentage else 0) %}
-                        <td colspan="{{ num_columnas }}">No hay datos disponibles para este nodo</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+      <div class="action-bar">
+        <div class="meta-info">
+          <p id="total">Total de registros: {{ datos|length }}</p>
         </div>
-    </main>
+        <button id="btn-refresh" class="btn">Recargar Datos</button>
+      </div>
 
-    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script>
-        const NODE_ID = "{{ node_id }}";
-        const CAMPOS = {{ campos|tojson }};  // Campos que tiene este nodo
-        const statusDiv = document.getElementById('status');
-        const totalEl = document.getElementById('total');
-        const btnRefresh = document.getElementById('btn-refresh');
-        const tbody = document.querySelector('#tabla-datos tbody');
-        const socket = io(window.location.origin, { transports: ['polling'] });
+      <!-- Sección de Gráficas -->
+      <div class="charts-container">
+        {% if campos.temperatura %}
+        <div class="chart-card">
+          <h3>Temperatura (°C)</h3>
+          <canvas id="chartTemperatura"></canvas>
+        </div>
+        {% endif %}
 
-        // ==================== CONFIGURACIÓN DE GRÁFICAS ====================
-        const MAX_DATOS_GRAFICA = 30; // Mostrar últimos 30 puntos en la gráfica
+        {% if campos.humedad %}
+        <div class="chart-card">
+          <h3>Humedad (%)</h3>
+          <canvas id="chartHumedad"></canvas>
+        </div>
+        {% endif %}
 
-        const chartConfig = {
-            type: 'line',
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    x: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Tiempo'
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45
-                        }
-                    },
-                    y: {
-                        display: true,
-                        beginAtZero: false
-                    }
-                },
-                animation: {
-                    duration: 750
-                }
-            }
-        };
+        {% if campos.soil_moisture %}
+        <div class="chart-card">
+          <h3>Humedad del Suelo</h3>
+          <canvas id="chartSoilMoisture"></canvas>
+        </div>
+        {% endif %}
 
-        // Inicializar gráficas
-        let chartTemperatura, chartHumedad, chartSoilMoisture, chartLight;
+        {% if campos.light or campos.light_percentage %}
+        <div class="chart-card">
+          <h3>Luz (lux)</h3>
+          <canvas id="chartLight"></canvas>
+        </div>
+        {% endif %}
+      </div>
 
-        if (CAMPOS.temperatura) {
-            chartTemperatura = new Chart(document.getElementById('chartTemperatura'), {
-                ...chartConfig,
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Temperatura (°C)',
-                        data: [],
-                        borderColor: '#73c6b6',
-                        backgroundColor: 'rgba(115, 198, 182, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                }
-            });
+      <table id="tabla-datos">
+        <thead>
+          <tr>
+            <th>ID</th>
+            {% if campos.temperatura %}<th>Temp (°C)</th>{% endif %}
+            {% if campos.humedad %}<th>Humedad (%)</th>{% endif %}
+            {% if campos.soil_moisture %}<th>Hum. Suelo</th>{% endif %}
+            {% if campos.light or campos.light_percentage %}<th>Luz(lux) - (%)</th>{% endif %}
+            <th>Timestamp</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for dato in datos %}
+          <tr>
+            <td>{{ dato.id }}</td>
+            {% if campos.temperatura %}<td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-'
+              }}</td>{% endif %}
+            {% if campos.humedad %}<td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}</td>{%
+            endif %}
+            {% if campos.soil_moisture %}<td>{{ "%.0f"|format(dato.soil_moisture) if dato.soil_moisture is not none else
+              '-' }}</td>{% endif %}
+            {% if campos.light or campos.light_percentage %}
+            <td>
+              {% if dato.light is not none and dato.percentage is not none %}
+              {{ "%.2f"|format(dato.light) }} - {{ "%.0f"|format(dato.percentage) }}%
+              {% elif dato.light is not none %}
+              {{ "%.2f"|format(dato.light) }}
+              {% elif dato.percentage is not none %}
+              {{ "%.0f"|format(dato.percentage) }}%
+              {% else %}
+              -
+              {% endif %}
+            </td>
+            {% endif %}
+            <td>{{ dato.timestamp or '-' }}</td>
+            <td>{{ dato.fecha_creacion or '-' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            {% set num_columnas = 3 + (1 if campos.temperatura else 0) + (1 if campos.humedad else 0) + (1 if
+            campos.soil_moisture else 0) + (1 if campos.light or campos.light_percentage else 0) %}
+            <td colspan="{{ num_columnas }}">No hay datos disponibles para este nodo</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Tema: script de inicialización (no interfiere con los scripts de abajo) -->
+  <script>
+    (function () {
+    const root = document.documentElement;
+    const body = document.body;
+    const themeSwitch = document.getElementById('themeSwitch');
+    const STORAGE_KEY = 'site-theme';
+
+    function applyTheme(theme) {
+        const isDark = theme === 'dark';
+        if (isDark) {
+            root.setAttribute('data-theme', 'dark');
+            body.classList.add('dark-mode');
+        } else {
+            root.removeAttribute('data-theme');
+            body.classList.remove('dark-mode');
         }
+    }
 
-        if (CAMPOS.humedad) {
-            chartHumedad = new Chart(document.getElementById('chartHumedad'), {
-                ...chartConfig,
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Humedad (%)',
-                        data: [],
-                        borderColor: '#85c1e9',
-                        backgroundColor: 'rgba(133, 193, 233, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                }
-            });
+    function detectInitialTheme() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved === 'dark' || saved === 'light') return saved;
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return 'dark';
         }
+        return 'light';
+    }
 
-        if (CAMPOS.soil_moisture) {
-            chartSoilMoisture = new Chart(document.getElementById('chartSoilMoisture'), {
-                ...chartConfig,
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Humedad del Suelo',
-                        data: [],
-                        borderColor: '#8B4513',
-                        backgroundColor: 'rgba(139, 69, 19, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                }
-            });
+    function toggleTheme() {
+        const current = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        const next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        try { 
+            localStorage.setItem(STORAGE_KEY, next); 
+        } catch (e) {
+            console.warn('No se pudo guardar la preferencia del tema:', e);
         }
+    }
 
-        if (CAMPOS.light || CAMPOS.light_percentage) {
-            chartLight = new Chart(document.getElementById('chartLight'), {
-                ...chartConfig,
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Luz (lux)',
-                        data: [],
-                        borderColor: '#FFD700',
-                        backgroundColor: 'rgba(255, 215, 0, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                }
-            });
-        }
+    // Inicializar tema
+    applyTheme(detectInitialTheme());
 
-        // Función para actualizar gráficas con nuevos datos
-        function actualizarGraficas(datos) {
-            // Ordenar datos por fecha (más antiguos primero)
-            datos.sort((a, b) => {
-                const dateA = new Date(a.fecha_creacion);
-                const dateB = new Date(b.fecha_creacion);
-                return dateA - dateB;
-            });
-
-            // Tomar solo los últimos MAX_DATOS_GRAFICA
-            const datosRecientes = datos.slice(-MAX_DATOS_GRAFICA);
-
-            // Extraer labels (fechas formateadas)
-            const labels = datosRecientes.map(d => {
-                const fecha = new Date(d.fecha_creacion);
-                return fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-            });
-
-            // Actualizar gráfica de temperatura
-            if (chartTemperatura && CAMPOS.temperatura) {
-                chartTemperatura.data.labels = labels;
-                chartTemperatura.data.datasets[0].data = datosRecientes.map(d => d.temperatura);
-                chartTemperatura.update('none');
-            }
-
-            // Actualizar gráfica de humedad
-            if (chartHumedad && CAMPOS.humedad) {
-                chartHumedad.data.labels = labels;
-                chartHumedad.data.datasets[0].data = datosRecientes.map(d => d.humedad);
-                chartHumedad.update('none');
-            }
-
-            // Actualizar gráfica de humedad del suelo
-            if (chartSoilMoisture && CAMPOS.soil_moisture) {
-                chartSoilMoisture.data.labels = labels;
-                chartSoilMoisture.data.datasets[0].data = datosRecientes.map(d => d.soil_moisture);
-                chartSoilMoisture.update('none');
-            }
-
-            // Actualizar gráfica de luz
-            if (chartLight && (CAMPOS.light || CAMPOS.light_percentage)) {
-                chartLight.data.labels = labels;
-                chartLight.data.datasets[0].data = datosRecientes.map(d => d.light);
-                chartLight.update('none');
-            }
-        }
-
-        // Cargar datos iniciales en las gráficas
-        const datosIniciales = {{ datos_json | tojson }};
-        if (datosIniciales && datosIniciales.length > 0) {
-            actualizarGraficas(datosIniciales);
-        }
-
-        socket.on('connect', () => {
-            console.log('Conectado al servidor WebSocket', socket.id);
-            statusDiv.textContent = 'Conectado - Escuchando datos del nodo ' + NODE_ID;
-            statusDiv.style.background = '#d1e7dd';
-            statusDiv.style.color = '#0f5132';
+    // Eventos
+    if (themeSwitch) {
+        themeSwitch.addEventListener('click', function (e) {
+            e.preventDefault();
+            toggleTheme();
         });
-
-        socket.on('connect_error', (err) => {
-            console.error('connect_error', err);
-            statusDiv.textContent = 'Error de conexión: ' + (err && err.message ? err.message : err);
-            statusDiv.style.background = '#f8d7da';
-            statusDiv.style.color = '#721c24';
-        });
-
-        socket.on('disconnect', (reason) => {
-            console.warn('Desconectado:', reason);
-            statusDiv.textContent = 'Desconectado: ' + reason;
-            statusDiv.style.background = '#fff3cd';
-            statusDiv.style.color = '#856404';
-        });
-
-        socket.on('nuevo_dato', (dato) => {
-            if (dato && dato.nodeId && String(dato.nodeId) === String(NODE_ID)) {
-                console.log('Nuevo dato para este nodo:', dato);
-                agregarFilaDesdeObjeto(dato, true);
-
-                // Actualizar gráficas con el nuevo dato
-                agregarDatoAGraficas(dato);
+        
+        themeSwitch.addEventListener('keydown', function (e) {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                toggleTheme();
             }
         });
+    }
 
-        // Función para agregar un nuevo dato a las gráficas
-        function agregarDatoAGraficas(dato) {
-            const fecha = new Date(dato.fecha_creacion);
-            const label = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-
-            // Agregar a gráfica de temperatura
-            if (chartTemperatura && dato.temperatura !== undefined && dato.temperatura !== null) {
-                chartTemperatura.data.labels.push(label);
-                chartTemperatura.data.datasets[0].data.push(dato.temperatura);
-
-                // Mantener solo MAX_DATOS_GRAFICA puntos
-                if (chartTemperatura.data.labels.length > MAX_DATOS_GRAFICA) {
-                    chartTemperatura.data.labels.shift();
-                    chartTemperatura.data.datasets[0].data.shift();
-                }
-                chartTemperatura.update();
-            }
-
-            // Agregar a gráfica de humedad
-            if (chartHumedad && dato.humedad !== undefined && dato.humedad !== null) {
-                chartHumedad.data.labels.push(label);
-                chartHumedad.data.datasets[0].data.push(dato.humedad);
-
-                if (chartHumedad.data.labels.length > MAX_DATOS_GRAFICA) {
-                    chartHumedad.data.labels.shift();
-                    chartHumedad.data.datasets[0].data.shift();
-                }
-                chartHumedad.update();
-            }
-
-            // Agregar a gráfica de humedad del suelo
-            if (chartSoilMoisture && dato.soil_moisture !== undefined && dato.soil_moisture !== null) {
-                chartSoilMoisture.data.labels.push(label);
-                chartSoilMoisture.data.datasets[0].data.push(dato.soil_moisture);
-
-                if (chartSoilMoisture.data.labels.length > MAX_DATOS_GRAFICA) {
-                    chartSoilMoisture.data.labels.shift();
-                    chartSoilMoisture.data.datasets[0].data.shift();
-                }
-                chartSoilMoisture.update();
-            }
-
-            // Agregar a gráfica de luz
-            if (chartLight && dato.light !== undefined && dato.light !== null) {
-                chartLight.data.labels.push(label);
-                chartLight.data.datasets[0].data.push(dato.light);
-
-                if (chartLight.data.labels.length > MAX_DATOS_GRAFICA) {
-                    chartLight.data.labels.shift();
-                    chartLight.data.datasets[0].data.shift();
-                }
-                chartLight.update();
-            }
-        }
-
-        // Calcular colspan dinámicamente
-        const numColumnas = 3 + (CAMPOS.temperatura ? 1 : 0) + (CAMPOS.humedad ? 1 : 0) + 
-                            (CAMPOS.soil_moisture ? 1 : 0) + 
-                            ((CAMPOS.light || CAMPOS.light_percentage) ? 1 : 0);
-
-        btnRefresh.addEventListener('click', () => {
-            statusDiv.textContent = 'Solicitando últimos 100 registros...';
-            statusDiv.style.background = '#fff3cd';
-            statusDiv.style.color = '#856404';
-            tbody.innerHTML = `<tr><td colspan="${numColumnas}">Cargando...</td></tr>`;
-            socket.emit('solicitar_datos', { limit: 100, offset: 0, nodeId: NODE_ID });
-        });
-
-        socket.on('resultado_datos', (payload) => {
-            console.log('Datos históricos recibidos:', payload);
-            if (payload && payload.datos && Array.isArray(payload.datos)) {
-                tbody.innerHTML = ''; // Limpiar la tabla
-                if (payload.datos.length === 0) {
-                     tbody.innerHTML = `<tr><td colspan="${numColumnas}">No hay datos disponibles para este nodo.</td></tr>`;
-                } else {
-                    payload.datos.forEach(d => agregarFilaDesdeObjeto(d, false));
-
-                    // Actualizar gráficas con los datos históricos
-                    actualizarGraficas(payload.datos);
-                }
-                totalEl.textContent = 'Mostrando ' + tbody.children.length + ' registros';
-                statusDiv.textContent = 'Datos actualizados';
+    // Cambios de preferencia del sistema
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved !== 'dark' && saved !== 'light') {
+                applyTheme(e.matches ? 'dark' : 'light');
             }
         });
+    }
+})();
+  </script>
 
-        function agregarFilaDesdeObjeto(dato, alFrente = true) {
-            // Si la tabla dice que no hay datos, limpiarla primero
-            const emptyRow = tbody.querySelector(`td[colspan]`);
-            if(emptyRow) {
-                tbody.innerHTML = '';
-            }
-            
-            const nuevaFila = alFrente ? tbody.insertRow(0) : tbody.insertRow(-1);
-            if(alFrente) {
-                nuevaFila.className = 'nuevo';
-            }
-
-            // ID (siempre presente)
-            nuevaFila.insertCell(-1).textContent = dato.id ?? '-';
-            
-            // Temperatura (si el nodo la envía)
-            if (CAMPOS.temperatura) {
-                nuevaFila.insertCell(-1).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? 
-                    `${Number(dato.temperatura).toFixed(1)}` : '-';
-            }
-            
-            // Humedad (si el nodo la envía)
-            if (CAMPOS.humedad) {
-                nuevaFila.insertCell(-1).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? 
-                    `${Number(dato.humedad).toFixed(1)}` : '-';
-            }
-            
-            // Humedad del suelo (si el nodo la envía)
-            if (CAMPOS.soil_moisture) {
-                nuevaFila.insertCell(-1).textContent = (dato.soil_moisture !== undefined && dato.soil_moisture !== null) ? 
-                    `${Number(dato.soil_moisture).toFixed(0)}` : '-';
-            }
-            
-            // Luz (si el nodo la envía)
-            if (CAMPOS.light || CAMPOS.light_percentage) {
-                let luzTexto = '-';
-                if (dato.light !== undefined && dato.light !== null && dato.percentage !== undefined && dato.percentage !== null) {
-                    luzTexto = `${Number(dato.light).toFixed(2)} - ${Number(dato.percentage).toFixed(0)}%`;
-                } else if (dato.light !== undefined && dato.light !== null) {
-                    luzTexto = `${Number(dato.light).toFixed(2)}`;
-                } else if (dato.percentage !== undefined && dato.percentage !== null) {
-                    luzTexto = `${Number(dato.percentage).toFixed(0)}%`;
-                }
-                nuevaFila.insertCell(-1).textContent = luzTexto;
-            }
-            
-            // Timestamp y Fecha (siempre presentes)
-            nuevaFila.insertCell(-1).textContent = dato.timestamp ?? '-';
-            nuevaFila.insertCell(-1).textContent = dato.fecha_creacion ?? '-';
-
-            if (alFrente) {
-                 const total = tbody.rows.length;
-                 totalEl.textContent = 'Mostrando ' + total + ' registros';
-            }
-
-            // Limitar a 100 filas en DOM
-            while (tbody.rows.length > 100) {
-                tbody.deleteRow(tbody.rows.length - 1);
-            }
-        }
-    </script>
+  
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+  
+  </script>
 </body>
+
 </html>

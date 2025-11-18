@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,6 +8,7 @@
     <link rel="icon" href="{{ url_for('static', filename='agrolink.png') }}" type="image/x-icon">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
+
 <body>
     <nav class="navbar">
         <a href="{{ url_for('home') }}" class="brand" title="Inicio">
@@ -26,13 +28,42 @@
                 </ul>
             </li>
         </ul>
+
+        <!-- Toggle de tema: colocado fuera del <ul> para mantener HTML válido -->
+        <!-- Toggle de tema - Versión simplificada -->
+        <div class="theme-toggle">
+            <button class="theme-switch" id="themeSwitch" aria-label="Cambiar tema">
+                <span class="icon icon-sun" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="4" fill="currentColor" />
+                        <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"
+                            opacity="0.95">
+                            <path d="M12 2v2" />
+                            <path d="M12 20v2" />
+                            <path d="M4.22 4.22l1.42 1.42" />
+                            <path d="M18.36 18.36l1.42 1.42" />
+                            <path d="M2 12h2" />
+                            <path d="M20 12h2" />
+                            <path d="M4.22 19.78l1.42-1.42" />
+                            <path d="M18.36 5.64l1.42-1.42" />
+                        </g>
+                    </svg>
+                </span>
+                <span class="icon icon-moon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M21 12.79A9 9 0 116.21 3 7 7 0 0021 12.79z" fill="currentColor" />
+                    </svg>
+                </span>
+                <span class="knob" aria-hidden="true"></span>
+            </button>
+        </div>
     </nav>
 
     <main class="main-content">
         <div class="card">
             <h1>Bienvenido a AgroLink</h1>
             <p>Proximamente mas info ;)</p>
-            
+
             {% if mapa %}
             <h2>Ubicación de Nodos</h2>
             <div class="map-container">
@@ -41,5 +72,74 @@
             {% endif %}
         </div>
     </main>
+
+    <script>
+        (function () {
+    const root = document.documentElement;
+    const body = document.body;
+    const themeSwitch = document.getElementById('themeSwitch');
+    const STORAGE_KEY = 'site-theme';
+
+    function applyTheme(theme) {
+        const isDark = theme === 'dark';
+        if (isDark) {
+            root.setAttribute('data-theme', 'dark');
+            body.classList.add('dark-mode');
+        } else {
+            root.removeAttribute('data-theme');
+            body.classList.remove('dark-mode');
+        }
+    }
+
+    function detectInitialTheme() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved === 'dark' || saved === 'light') return saved;
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return 'dark';
+        }
+        return 'light';
+    }
+
+    function toggleTheme() {
+        const current = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        const next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        try { 
+            localStorage.setItem(STORAGE_KEY, next); 
+        } catch (e) {
+            console.warn('No se pudo guardar la preferencia del tema:', e);
+        }
+    }
+
+    // Inicializar tema
+    applyTheme(detectInitialTheme());
+
+    // Eventos
+    if (themeSwitch) {
+        themeSwitch.addEventListener('click', function (e) {
+            e.preventDefault();
+            toggleTheme();
+        });
+        
+        themeSwitch.addEventListener('keydown', function (e) {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                toggleTheme();
+            }
+        });
+    }
+
+    // Cambios de preferencia del sistema
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved !== 'dark' && saved !== 'light') {
+                applyTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    }
+})();
+    </script>
 </body>
+
 </html>

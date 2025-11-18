@@ -1,156 +1,255 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="">
+
 <head>
-    <title>Datos DHT22 - AgroLink</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="{{ url_for('static', filename='agrolink.png') }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <title>Datos DHT22 - AgroLink</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="{{ url_for('static', filename='agrolink.png') }}" type="image/x-icon">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
+
 <body>
-    <nav class="navbar">
-        <a href="{{ url_for('home') }}" class="brand" title="Inicio">
-            <img src="{{ url_for('static', filename='agrolink.png') }}" alt="AgroLink" />
-            <span>AgroLink</span>
-        </a>
-        <ul class="nav-links">
-            <li><a href="{{ url_for('ver_datos') }}">Tabla General</a></li>
-            <li class="dropdown">
-                <span>Nodos</span>
-                <ul class="submenu">
-                    {% for node in nodos %}
-                    <li><a href="{{ url_for('ver_por_nodo', node_id=node) }}">{{ node }}</a></li>
-                    {% else %}
-                    <li><span>Sin nodos</span></li>
-                    {% endfor %}
-                </ul>
-            </li>
+  <nav class="navbar">
+    <a href="{{ url_for('home') }}" class="brand" title="Inicio">
+      <img src="{{ url_for('static', filename='agrolink.png') }}" alt="AgroLink" />
+      <span>AgroLink</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="{{ url_for('ver_datos') }}">Tabla General</a></li>
+      <li class="dropdown">
+        <span>Nodos</span>
+        <ul class="submenu">
+          {% for node in nodos %}
+          <li><a href="{{ url_for('ver_por_nodo', node_id=node) }}">{{ node }}</a></li>
+          {% else %}
+          <li><span>Sin nodos</span></li>
+          {% endfor %}
         </ul>
-    </nav>
+      </li>
+    </ul>
 
-    <main class="main-content">
-        <div class="card">
-            <h1>Datos de Todos los Sensores</h1>
-            <div id="status" class="status-bar">Conectando al servidor WebSocket...</div>
-            <p id="total">Total de registros: {{ datos|length }}</p>
+    <!-- Toggle de tema -->
+    <!-- Toggle de tema - Versión simplificada -->
+    <div class="theme-toggle">
+      <button class="theme-switch" id="themeSwitch" aria-label="Cambiar tema">
+        <span class="icon icon-sun" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="4" fill="currentColor" />
+            <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="M4.22 4.22l1.42 1.42" />
+              <path d="M18.36 18.36l1.42 1.42" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="M4.22 19.78l1.42-1.42" />
+              <path d="M18.36 5.64l1.42-1.42" />
+            </g>
+          </svg>
+        </span>
+        <span class="icon icon-moon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M21 12.79A9 9 0 116.21 3 7 7 0 0021 12.79z" fill="currentColor" />
+          </svg>
+        </span>
+        <span class="knob" aria-hidden="true"></span>
+      </button>
+    </div>
+  </nav>
 
-            <table id="tabla-datos">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nodo</th>
-                        <th>Temp (°C)</th>
-                        <th>Humedad (%)</th>
-                        <th>Hum. Suelo</th>
-                        <th>Luz(lux) - (%)</th>
-                        <th>Fecha</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for dato in datos %}
-                    <tr>
-                        <td>{{ dato.id }}</td>
-                        <td>{{ dato.nodeId or '-' }}</td>
-                        <td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-' }}</td>
-                        <td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}</td>
-                        <td>{{ "%.0f"|format(dato.soil_moisture) if dato.soil_moisture is not none else '-' }}</td>
-                        <td>
-                            {% if dato.light is not none and dato.percentage is not none %}
-                                {{ "%.2f"|format(dato.light) }} - {{ "%.0f"|format(dato.percentage) }}%
-                            {% elif dato.light is not none %}
-                                {{ "%.2f"|format(dato.light) }}
-                            {% elif dato.percentage is not none %}
-                                {{ "%.0f"|format(dato.percentage) }}%
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>{{ dato.fecha_creacion or '-' }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="7">No hay datos disponibles</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </main>
-    
-    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-    <script>
-        const statusDiv = document.getElementById('status');
-        const socket = io(window.location.origin, { transports: ['polling'] });
+  <main class="main-content">
+    <div class="card">
+      <h1>Datos de Todos los Sensores</h1>
+      <div id="status" class="status-bar">Conectando al servidor WebSocket...</div>
+      <p id="total">Total de registros: {{ datos|length }}</p>
 
-        socket.on('connect', () => {
-            console.log('Conectado al servidor WebSocket', socket.id);
-            statusDiv.textContent = 'Conectado al servidor WebSocket';
-            statusDiv.style.background = '#d1e7dd';
-            statusDiv.style.color = '#0f5132';
-        });
+      <table id="tabla-datos">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nodo</th>
+            <th>Temp (°C)</th>
+            <th>Humedad (%)</th>
+            <th>Hum. Suelo</th>
+            <th>Luz(lux) - (%)</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for dato in datos %}
+          <tr>
+            <td>{{ dato.id }}</td>
+            <td>{{ dato.nodeId or '-' }}</td>
+            <td>{{ "%.1f"|format(dato.temperatura) if dato.temperatura is not none else '-' }}</td>
+            <td>{{ "%.1f"|format(dato.humedad) if dato.humedad is not none else '-' }}</td>
+            <td>{{ "%.0f"|format(dato.soil_moisture) if dato.soil_moisture is not none else '-' }}</td>
+            <td>
+              {% if dato.light is not none and dato.percentage is not none %}
+              {{ "%.2f"|format(dato.light) }} - {{ "%.0f"|format(dato.percentage) }}%
+              {% elif dato.light is not none %}
+              {{ "%.2f"|format(dato.light) }}
+              {% elif dato.percentage is not none %}
+              {{ "%.0f"|format(dato.percentage) }}%
+              {% else %}
+              -
+              {% endif %}
+            </td>
+            <td>{{ dato.fecha_creacion or '-' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7">No hay datos disponibles</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
 
-        socket.on('connect_error', (err) => {
-            console.error('connect_error', err);
-            statusDiv.textContent = 'Error de conexión: ' + (err && err.message ? err.message : err);
-            statusDiv.style.background = '#f8d7da';
-            statusDiv.style.color = '#721c24';
-        });
+  <!-- Tema: script de inicialización -->
+  <script>
+    (function () {
+    const root = document.documentElement;
+    const body = document.body;
+    const themeSwitch = document.getElementById('themeSwitch');
+    const STORAGE_KEY = 'site-theme';
 
-        socket.on('disconnect', (reason) => {
-            console.warn('Desconectado:', reason);
-            statusDiv.textContent = 'Desconectado: ' + reason;
-            statusDiv.style.background = '#fff3cd';
-            statusDiv.style.color = '#856404';
-        });
-
-        socket.on('reconnect_attempt', () => {
-            statusDiv.textContent = 'Intentando reconectar...';
-        });
-
-        socket.on('reconnect', (attempt) => {
-            statusDiv.textContent = 'Reconectado';
-        });
-
-        socket.on('nuevo_dato', (dato) => {
-            console.log('Nuevo dato recibido:', dato);
-            agregarFilaDesdeObjeto(dato, true);
-        });
-
-        function agregarFilaDesdeObjeto(dato, alFrente=true) {
-            const tbody = document.querySelector('#tabla-datos tbody');
-            const nuevaFila = alFrente ? tbody.insertRow(0) : tbody.insertRow(-1);
-            nuevaFila.className = 'nuevo';
-
-            // Usar -1 para insertar al final de la fila en orden
-            nuevaFila.insertCell(0).textContent = dato.id ?? '-';
-            nuevaFila.insertCell(1).textContent = dato.nodeId ?? '-';
-            nuevaFila.insertCell(2).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? `${Number(dato.temperatura).toFixed(1)}` : '-';
-            nuevaFila.insertCell(3).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? `${Number(dato.humedad).toFixed(1)}` : '-';
-            nuevaFila.insertCell(4).textContent = (dato.soil_moisture !== undefined && dato.soil_moisture !== null) ? `${Number(dato.soil_moisture).toFixed(0)}` : '-';
-
-            let luzTexto = '-';
-            if (dato.light !== undefined && dato.light !== null && dato.percentage !== undefined && dato.percentage !== null) {
-                luzTexto = `${Number(dato.light).toFixed(2)} - ${Number(dato.percentage).toFixed(0)}%`;
-            } else if (dato.light !== undefined && dato.light !== null) {
-                luzTexto = `${Number(dato.light).toFixed(2)}`;
-            } else if (dato.percentage !== undefined && dato.percentage !== null) {
-                luzTexto = `${Number(dato.percentage).toFixed(0)}%`;
-            }
-            nuevaFila.insertCell(5).textContent = luzTexto;
-
-            nuevaFila.insertCell(6).textContent = dato.fecha_creacion ?? '-';
-
-            const totalEl = document.getElementById('total');
-            const totalText = totalEl.textContent.match(/\d+/);
-            const total = totalText ? parseInt(totalText[0]) : 0;
-            if (alFrente) {
-                totalEl.textContent = 'Total de registros: ' + (total + 1);
-            }
-
-            while (tbody.rows.length > 100) {
-                tbody.deleteRow(tbody.rows.length - 1);
-            }
+    function applyTheme(theme) {
+        const isDark = theme === 'dark';
+        if (isDark) {
+            root.setAttribute('data-theme', 'dark');
+            body.classList.add('dark-mode');
+        } else {
+            root.removeAttribute('data-theme');
+            body.classList.remove('dark-mode');
         }
-    </script>
+    }
+
+    function detectInitialTheme() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved === 'dark' || saved === 'light') return saved;
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return 'dark';
+        }
+        return 'light';
+    }
+
+    function toggleTheme() {
+        const current = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        const next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        try { 
+            localStorage.setItem(STORAGE_KEY, next); 
+        } catch (e) {
+            console.warn('No se pudo guardar la preferencia del tema:', e);
+        }
+    }
+
+    // Inicializar tema
+    applyTheme(detectInitialTheme());
+
+    // Eventos
+    if (themeSwitch) {
+        themeSwitch.addEventListener('click', function (e) {
+            e.preventDefault();
+            toggleTheme();
+        });
+        
+        themeSwitch.addEventListener('keydown', function (e) {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                toggleTheme();
+            }
+        });
+    }
+
+    // Cambios de preferencia del sistema
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved !== 'dark' && saved !== 'light') {
+                applyTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    }
+})();
+  </script>
+
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script>
+    const statusDiv = document.getElementById('status');
+    const socket = io(window.location.origin, { transports: ['polling'] });
+
+    socket.on('connect', () => {
+      console.log('Conectado al servidor WebSocket', socket.id);
+      statusDiv.textContent = 'Conectado al servidor WebSocket';
+      statusDiv.style.background = '#d1e7dd';
+      statusDiv.style.color = '#0f5132';
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('connect_error', err);
+      statusDiv.textContent = 'Error de conexión: ' + (err && err.message ? err.message : err);
+      statusDiv.style.background = '#f8d7da';
+      statusDiv.style.color = '#721c24';
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.warn('Desconectado:', reason);
+      statusDiv.textContent = 'Desconectado: ' + reason;
+      statusDiv.style.background = '#fff3cd';
+      statusDiv.style.color = '#856404';
+    });
+
+    socket.on('reconnect_attempt', () => {
+      statusDiv.textContent = 'Intentando reconectar...';
+    });
+
+    socket.on('reconnect', (attempt) => {
+      statusDiv.textContent = 'Reconectado';
+    });
+
+    socket.on('nuevo_dato', (dato) => {
+      console.log('Nuevo dato recibido:', dato);
+      agregarFilaDesdeObjeto(dato, true);
+    });
+
+    function agregarFilaDesdeObjeto(dato, alFrente = true) {
+      const tbody = document.querySelector('#tabla-datos tbody');
+      const nuevaFila = alFrente ? tbody.insertRow(0) : tbody.insertRow(-1);
+      nuevaFila.className = 'nuevo';
+
+      nuevaFila.insertCell(0).textContent = dato.id ?? '-';
+      nuevaFila.insertCell(1).textContent = dato.nodeId ?? '-';
+      nuevaFila.insertCell(2).textContent = (dato.temperatura !== undefined && dato.temperatura !== null) ? `${Number(dato.temperatura).toFixed(1)}` : '-';
+      nuevaFila.insertCell(3).textContent = (dato.humedad !== undefined && dato.humedad !== null) ? `${Number(dato.humedad).toFixed(1)}` : '-';
+      nuevaFila.insertCell(4).textContent = (dato.soil_moisture !== undefined && dato.soil_moisture !== null) ? `${Number(dato.soil_moisture).toFixed(0)}` : '-';
+
+      let luzTexto = '-';
+      if (dato.light !== undefined && dato.light !== null && dato.percentage !== undefined && dato.percentage !== null) {
+        luzTexto = `${Number(dato.light).toFixed(2)} - ${Number(dato.percentage).toFixed(0)}%`;
+      } else if (dato.light !== undefined && dato.light !== null) {
+        luzTexto = `${Number(dato.light).toFixed(2)}`;
+      } else if (dato.percentage !== undefined && dato.percentage !== null) {
+        luzTexto = `${Number(dato.percentage).toFixed(0)}%`;
+      }
+      nuevaFila.insertCell(5).textContent = luzTexto;
+
+      nuevaFila.insertCell(6).textContent = dato.fecha_creacion ?? '-';
+
+      const totalEl = document.getElementById('total');
+      const totalText = totalEl.textContent.match(/\d+/);
+      const total = totalText ? parseInt(totalText[0]) : 0;
+      if (alFrente) {
+        totalEl.textContent = 'Total de registros: ' + (total + 1);
+      }
+
+      while (tbody.rows.length > 100) {
+        tbody.deleteRow(tbody.rows.length - 1);
+      }
+    }
+  </script>
 </body>
+
 </html>
