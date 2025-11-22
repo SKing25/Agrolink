@@ -7,7 +7,7 @@ BROKER = "localhost"
 PORT = 1883
 TOPIC = "dht22/datos/+" 
 
-SERVER_URL = "https://agrolink.app/datos"
+SERVER_URL = "http://localhost:5000/datos"
 
 node_cache = {}
 
@@ -27,6 +27,22 @@ def on_message(client, userdata, msg):
 
         data = json.loads(payload)
         node_id = topic.split("/")[-1] if "/" in topic else "unknown"
+        
+        # Caso especial: Gateway reportando su IP
+        if node_id == "gateway" and "ip" in data:
+            gateway_data = {
+                "nodeId": "gateway",
+                "ip": data["ip"],
+                "nodes": data.get("nodes", 0),
+                "timestamp": int(time.time())
+            }
+            print(f"Gateway IP: {data['ip']} - Nodos conectados: {data.get('nodes', 0)}")
+            response = requests.post(SERVER_URL, json=gateway_data, timeout=10)
+            if response.status_code == 200:
+                print("IP del gateway enviada al servidor\n")
+            else:
+                print(f"Error al enviar IP: {response.status_code}\n")
+            return
         
         # Inicializar cache del nodo si no existe
         if node_id not in node_cache:
@@ -54,6 +70,12 @@ def on_message(client, userdata, msg):
         if "soil_moisture" in data or "humedad_suelo" in data:
             node_cache[node_id]["soil_moisture"] = data["soil_moisture"]
             print(f"soil_moisture: {data['soil_moisture']}%")
+        
+        # GPS coordinates (nuevos campos)
+        if "lat" in data and "lon" in data:
+            node_cache[node_id]["lat"] = data["lat"]
+            node_cache[node_id]["lon"] = data["lon"]
+            print(f"GPS: {data['lat']}, {data['lon']}")
         
         # Preparar datos para enviar
         complete_data = {
