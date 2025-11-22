@@ -75,91 +75,10 @@
         </div>
     </main>
 
-    <script>
-        (function () {
-    const root = document.documentElement;
-    const body = document.body;
-    const themeSwitch = document.getElementById('themeSwitch');
-    const STORAGE_KEY = 'site-theme';
-
-    function applyTheme(theme) {
-        const isDark = theme === 'dark';
-        if (isDark) {
-            root.setAttribute('data-theme', 'dark');
-            body.classList.add('dark-mode');
-        } else {
-            root.removeAttribute('data-theme');
-            body.classList.remove('dark-mode');
-        }
-    }
-
-    function detectInitialTheme() {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved === 'dark' || saved === 'light') return saved;
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            return 'dark';
-        }
-        return 'light';
-    }
-
-    function toggleTheme() {
-        const current = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-        const next = current === 'dark' ? 'light' : 'dark';
-        applyTheme(next);
-        try { 
-            localStorage.setItem(STORAGE_KEY, next); 
-        } catch (e) {
-            console.warn('No se pudo guardar la preferencia del tema:', e);
-        }
-    }
-
-    // Inicializar tema
-    applyTheme(detectInitialTheme());
-
-    // Eventos
-    if (themeSwitch) {
-        themeSwitch.addEventListener('click', function (e) {
-            e.preventDefault();
-            toggleTheme();
-        });
-        
-        themeSwitch.addEventListener('keydown', function (e) {
-            if (e.key === ' ' || e.key === 'Enter') {
-                e.preventDefault();
-                toggleTheme();
-            }
-        });
-    }
-
-    // Cambios de preferencia del sistema
-    if (window.matchMedia) {
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved !== 'dark' && saved !== 'light') {
-                applyTheme(e.matches ? 'dark' : 'light');
-            }
-        });
-    }
-})();
-    </script>
-
+    <script>window.PAGE_DATA = { gateway_ip: {{ (gateway_ip or 'null')|tojson }} };</script>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-    <script>
-        const socket = io(window.location.origin, { transports: ['polling'] });
-        const ipEl = document.getElementById('gatewayIP');
-
-        socket.on('datos_iniciales', (payload) => {
-            if (payload && payload.gateway_ip !== undefined && ipEl) {
-                ipEl.textContent = payload.gateway_ip || '—';
-            }
-        });
-
-        socket.on('gateway_ip', (data) => {
-            if (ipEl && data && 'ip' in data) {
-                ipEl.textContent = data.ip || '—';
-            }
-        });
-    </script>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
 </body>
 
 </html>
