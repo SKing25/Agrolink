@@ -240,6 +240,7 @@
   const ubicacionEl = document.getElementById('ubicacionNodo');
   const thisNodeId = {{ node_id|tojson }};
   const initialData = {{ datos_json|tojson }};
+  const camposNode = {{ campos|tojson }}; // Exponer qué columnas se muestran
 
   // Preparar datos en orden cronológico (ascendente)
   const sorted = [...initialData].sort((a, b) => {
@@ -252,6 +253,79 @@
   // Utilidades
   function clampLen(arr, max=200) { while (arr.length > max) arr.shift(); }
   function pushIfDefined(arr, v) { arr.push((v === undefined || v === null) ? null : Number(v)); }
+
+  // Función para insertar una fila nueva al inicio de la tabla
+  function insertarFila(d) {
+    if (!d) return;
+    const tbody = document.querySelector('#tabla-datos tbody');
+    if (!tbody) return;
+    // Evitar duplicados si ya existe el ID
+    if (d.id !== undefined) {
+      for (let i=0; i<tbody.rows.length; i++) {
+        const cell = tbody.rows[i].cells[0];
+        if (cell && cell.textContent == d.id) {
+          return; // ya existe
+        }
+      }
+    }
+    const fila = tbody.insertRow(0);
+    fila.className = 'nuevo';
+    // Orden de columnas igual que en el <thead>
+    // ID
+    fila.insertCell(-1).textContent = d.id ?? '-';
+    // Temperatura
+    if (camposNode.temperatura) {
+      const tCell = fila.insertCell(-1);
+      if (d.temperatura !== undefined && d.temperatura !== null) {
+        const t = Number(d.temperatura); tCell.textContent = isNaN(t) ? '-' : t.toFixed(1);
+      } else { tCell.textContent = '-'; }
+    }
+    // Humedad
+    if (camposNode.humedad) {
+      const hCell = fila.insertCell(-1);
+      if (d.humedad !== undefined && d.humedad !== null) {
+        const h = Number(d.humedad); hCell.textContent = isNaN(h) ? '-' : h.toFixed(1);
+      } else { hCell.textContent = '-'; }
+    }
+    // Humedad suelo
+    if (camposNode.soil_moisture) {
+      const sCell = fila.insertCell(-1);
+      if (d.soil_moisture !== undefined && d.soil_moisture !== null) {
+        const s = Number(d.soil_moisture); sCell.textContent = isNaN(s) ? '-' : s.toFixed(0);
+      } else { sCell.textContent = '-'; }
+    }
+    // Luz (lux - %)
+    const mostrarLuz = camposNode.light || camposNode.percentage;
+    if (mostrarLuz) {
+      const lCell = fila.insertCell(-1);
+      let luzTexto = '-';
+      const hasLight = d.light !== undefined && d.light !== null;
+      const hasPct = d.percentage !== undefined && d.percentage !== null;
+      if (hasLight && hasPct) {
+        luzTexto = `${Number(d.light).toFixed(2)} - ${Number(d.percentage).toFixed(0)}%`;
+      } else if (hasLight) {
+        luzTexto = `${Number(d.light).toFixed(2)}`;
+      } else if (hasPct) {
+        luzTexto = `${Number(d.percentage).toFixed(0)}%`;
+      }
+      lCell.textContent = luzTexto;
+    }
+    // Timestamp
+    fila.insertCell(-1).textContent = (d.timestamp !== undefined && d.timestamp !== null) ? d.timestamp : '-';
+    // Fecha
+    fila.insertCell(-1).textContent = d.fecha_creacion ?? '-';
+
+    // Actualizar contador
+    const totalEl = document.getElementById('total');
+    if (totalEl) {
+      const match = totalEl.textContent.match(/\d+/);
+      const current = match ? parseInt(match[0]) : 0;
+      totalEl.textContent = 'Total de registros: ' + (current + 1);
+    }
+
+    // Limitar filas
+    while (tbody.rows.length > 100) tbody.deleteRow(tbody.rows.length - 1);
+  }
 
   // Gráficas
   let chartTemperatura, chartHumedad, chartSoil, chartLight;
@@ -298,16 +372,15 @@
     if (ubicacionEl) {
       const lat = (data.lat !== undefined && data.lat !== null) ? Number(data.lat).toFixed(6) : '—';
       const lon = (data.lon !== undefined && data.lon !== null) ? Number(data.lon).toFixed(6) : '—';
-      const fecha = data.fecha || '';
-      ubicacionEl.textContent = `lat: ${lat}, lon: ${lon} ${fecha ? '(' + fecha + ')' : ''}`;
+      ubicacionEl.textContent = `lat: ${lat}, lon: ${lon}`;
     }
   });
 
-  // También actualizamos las gráficas si llegan datos de este nodo
+  // Actualizar gráficas y tabla en tiempo real
   socket.on('nuevo_dato', (dato) => {
     if (!dato || dato.nodeId !== thisNodeId) return;
     const label = dato.fecha_creacion || (dato.timestamp ? new Date(dato.timestamp * 1000).toISOString() : '');
-
+    // Gráficas
     {% if campos.temperatura %}
     if (chartTemperatura) {
       chartTemperatura.data.labels.push(label); clampLen(chartTemperatura.data.labels);
@@ -340,6 +413,8 @@
       chartLight.update('none');
     }
     {% endif %}
+    // Tabla
+    insertarFila(dato);
   });
   </script>
 </body>
