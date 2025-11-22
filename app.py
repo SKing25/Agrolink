@@ -17,7 +17,7 @@ from database import (
     set_gateway_ip,
     get_gateway_ip
 )
-import folium
+import folium  # Reimportado para crear_mapa en la página principal
 
 app = Flask(__name__)
 
@@ -60,18 +60,34 @@ def home():
         return f"Servidor AgroLink activo. Error: {str(e)}"
 
 
+def obtener_ubicaciones_nodos():
+    """Devuelve dict {nodeId: {lat, lon}} para todos los nodos con ubicación."""
+    locs = {}
+    for nid in obtener_nodos_unicos():
+        loc = obtener_ultima_ubicacion(nid)
+        if loc and loc.get('lat') is not None and loc.get('lon') is not None:
+            locs[nid] = {'lat': loc['lat'], 'lon': loc['lon']}
+    return locs
+
+
 @app.route('/nodo/<string:node_id>')
 def ver_por_nodo(node_id: str):
     try:
-        # Obtener datos del nodo específico
         datos = obtener_datos_paginados(limit=100, offset=0, node_id=node_id)
         dato = obtener_ultimo_dato(node_id=node_id)
         total_registros = contar_registros(node_id=node_id)
         nodos = obtener_nodos_unicos()
-        campos = obtener_campos_nodo(node_id)  # Detectar qué campos tiene este nodo
+        campos = obtener_campos_nodo(node_id)
         ubicacion = obtener_ultima_ubicacion(node_id)
+        ubicaciones_todos = obtener_ubicaciones_nodos()
 
-        # Convertir datos a diccionarios para serialización JSON
+        # Centro inicial para Leaflet
+        if ubicacion and ubicacion.get('lat') and ubicacion.get('lon'):
+            centro_lat = ubicacion['lat']
+            centro_lon = ubicacion['lon']
+        else:
+            centro_lat, centro_lon = 4.660753, -74.059945
+
         datos_dict = [d.to_dict() for d in datos]
 
         return render_template('nodo.html',
@@ -82,7 +98,10 @@ def ver_por_nodo(node_id: str):
                                ultimo_dato=dato,
                                nodos=nodos,
                                campos=campos,
-                               ubicacion=ubicacion
+                               ubicacion=ubicacion,
+                               centro_lat=centro_lat,
+                               centro_lon=centro_lon,
+                               ubicaciones_todos=ubicaciones_todos
                                )
     except Exception as e:
         return f"Error: {e}", 500
@@ -230,10 +249,9 @@ def recibir_datos():
         # Emitir evento en tiempo real a todos los clientes conectados
         try:
             payload = nuevo_dato.to_dict()
-            # Emitir a todos los clientes conectados
             socketio.emit('nuevo_dato', payload)
-            # Si trae ubicación, emitir evento específico de ubicación
             if payload.get('lat') is not None and payload.get('lon') is not None and payload.get('nodeId'):
+                print(f"Emitiendo ubicacion_nodo: {payload.get('nodeId')} {payload.get('lat')},{payload.get('lon')}")
                 socketio.emit('ubicacion_nodo', {
                     'nodeId': payload.get('nodeId'),
                     'lat': payload.get('lat'),

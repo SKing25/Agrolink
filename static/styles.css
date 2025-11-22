@@ -560,4 +560,21 @@ tr:hover td { color: var(--text-color); }
   }
 }
 
+#leaflet-map {
+  height: 380px;
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.leaflet-control-layers-expanded {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.chart-card canvas {
+  min-height: 240px !important;
+  width: 100% !important;
+}
+
 /* Fin de styles.css */
