@@ -62,6 +62,7 @@
     <div class="card">
       <h1>Datos de Todos los Sensores</h1>
       <div id="status" class="status-bar">Conectando al servidor WebSocket...</div>
+      <div class="status-bar">Gateway IP: <strong id="gatewayIP">{{ gateway_ip or '—' }}</strong></div>
       <p id="total">Total de registros: {{ datos|length }}</p>
 
       <table id="tabla-datos">
@@ -179,6 +180,7 @@
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <script>
     const statusDiv = document.getElementById('status');
+    const ipEl = document.getElementById('gatewayIP');
     const socket = io(window.location.origin, { transports: ['polling'] });
 
     socket.on('connect', () => {
@@ -186,6 +188,18 @@
       statusDiv.textContent = 'Conectado al servidor WebSocket';
       statusDiv.style.background = '#d1e7dd';
       statusDiv.style.color = '#0f5132';
+    });
+
+    socket.on('datos_iniciales', (payload) => {
+      if (payload && payload.gateway_ip !== undefined && ipEl) {
+        ipEl.textContent = payload.gateway_ip || '—';
+      }
+    });
+
+    socket.on('gateway_ip', (data) => {
+      if (ipEl && data && 'ip' in data) {
+        ipEl.textContent = data.ip || '—';
+      }
     });
 
     socket.on('connect_error', (err) => {
@@ -253,3 +267,4 @@
 </body>
 
 </html>
+

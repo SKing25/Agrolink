@@ -12,7 +12,10 @@ from database import (
     obtener_ultimo_dato,
     obtener_nodos_unicos,
     obtener_campos_nodo,
-    eliminar_dato
+    eliminar_dato,
+    obtener_ultima_ubicacion,
+    set_gateway_ip,
+    get_gateway_ip
 )
 import folium
 
@@ -44,11 +47,13 @@ def home():
         ultimo_dato = obtener_ultimo_dato()
         nodos = obtener_nodos_unicos()
         mapa_html = crear_mapa(4.660753, -74.059945)  # PROBANDO MAPITA
+        gateway_ip = get_gateway_ip()
         return render_template('index.html',
                                total_registros=total_registros,
                                ultimo_dato=ultimo_dato,
                                nodos=nodos,
-                               mapa=mapa_html # PROBANDO MAPITA
+                               mapa=mapa_html, # PROBANDO MAPITA
+                               gateway_ip=gateway_ip
                                )
 
     except Exception as e:
@@ -64,6 +69,7 @@ def ver_por_nodo(node_id: str):
         total_registros = contar_registros(node_id=node_id)
         nodos = obtener_nodos_unicos()
         campos = obtener_campos_nodo(node_id)  # Detectar qué campos tiene este nodo
+        ubicacion = obtener_ultima_ubicacion(node_id)
 
         # Convertir datos a diccionarios para serialización JSON
         datos_dict = [d.to_dict() for d in datos]
@@ -75,7 +81,8 @@ def ver_por_nodo(node_id: str):
                                total_registros=total_registros,
                                ultimo_dato=dato,
                                nodos=nodos,
-                               campos=campos
+                               campos=campos,
+                               ubicacion=ubicacion
                                )
     except Exception as e:
         return f"Error: {e}", 500
@@ -87,7 +94,8 @@ def ver_datos():
         # Enviar los últimos 100 datos y la lista de nodos al template para que pueda renderizar y recibir actualizaciones
         datos = obtener_todos_datos(limit=100)
         nodos = obtener_nodos_unicos()
-        return render_template('tabla.html', datos=datos, nodos=nodos)
+        gateway_ip = get_gateway_ip()
+        return render_template('tabla.html', datos=datos, nodos=nodos, gateway_ip=gateway_ip)
     except Exception as e:
         return f"Error: {e}", 500
 
@@ -102,6 +110,18 @@ def recibir_datos():
 
         if not data:
             return jsonify({"status": "error", "mensaje": "No se recibió JSON"}), 400
+
+        # Si es un mensaje de gateway con IP y sin sensores, manejar primero
+        if data.get('nodeId', '').lower() == 'gateway' and 'ip' in data and all(k not in data for k in ['temperatura','temperature','temp','t','humedad','humidity','hum','h','soil_moisture','light','luz','lux','l','percentage','luz_porcentaje','light_percentage','porcentaje','pct','lat','latitude','latitud','lon','longitude','longitud','lng']):
+            ip_val = str(data.get('ip')) if data.get('ip') else None
+            if ip_val:
+                if set_gateway_ip(ip_val):
+                    socketio.emit('gateway_ip', {'ip': ip_val})
+                    return jsonify({"status": "ok", "mensaje": "Gateway IP actualizada"}), 200
+                else:
+                    return jsonify({"status": "error", "mensaje": "No se pudo actualizar la Gateway IP"}), 500
+            else:
+                return jsonify({"status": "error", "mensaje": "IP vacía"}), 400
 
         # Normalizar nombres de campos - temperatura
         if 'temperatura' not in data:
@@ -143,18 +163,54 @@ def recibir_datos():
                         data.setdefault('percentage', data.pop(alt))
                     break
 
+        # Normalizar lat/lon
+        if 'lat' not in data:
+            for alt in ('latitude', 'latitud', 'y'):
+                if alt in data:
+                    try:
+                        data['lat'] = float(data.pop(alt))
+                    except Exception:
+                        data.setdefault('lat', data.pop(alt))
+                    break
+        if 'lon' not in data:
+            for alt in ('longitude', 'longitud', 'lng', 'x'):
+                if alt in data:
+                    try:
+                        data['lon'] = float(data.pop(alt))
+                    except Exception:
+                        data.setdefault('lon', data.pop(alt))
+                    break
+
+        # Normalizar IP de la gateway
+        gateway_ip_payload = None
+        for k in ('gateway_ip', 'ip', 'gatewayIP'):
+            if k in data and data.get(k):
+                gateway_ip_payload = str(data.get(k))
+                break
+
         # Extraer todos los valores posibles
         temperatura = data.get('temperatura')
         humedad = data.get('humedad')
         soil_moisture = data.get('soil_moisture')
         light = data.get('light')
         percentage = data.get('percentage')
+        lat = data.get('lat')
+        lon = data.get('lon')
         node_id = data.get('nodeId') or data.get('node_id') or 'unknown'
         timestamp = data.get('timestamp')
 
-        # Validar que venga al menos un dato de sensor
-        #if all(v is None for v in [temperatura, humedad, soil_moisture, light, percentage]):
-        #    return jsonify({"status": "error", "mensaje": "No se recibió ningún dato de sensor"}), 400
+        # Si el payload es solo para actualizar IP de gateway
+        if gateway_ip_payload and all(v is None for v in [temperatura, humedad, soil_moisture, light, percentage, lat, lon, timestamp]):
+            ok = set_gateway_ip(gateway_ip_payload)
+            if ok:
+                # Emitir a todos los clientes la IP actualizada
+                try:
+                    socketio.emit('gateway_ip', {'ip': gateway_ip_payload})
+                except Exception:
+                    pass
+                return jsonify({"status": "ok", "mensaje": "Gateway IP actualizada"}), 200
+            else:
+                return jsonify({"status": "error", "mensaje": "No se pudo actualizar la Gateway IP"}), 500
 
         # Guardar en base de datos usando la función del módulo database
         nuevo_dato = guardar_dato_sensor(
@@ -164,7 +220,9 @@ def recibir_datos():
             light=light,
             percentage=percentage,
             node_id=node_id,
-            timestamp=timestamp
+            timestamp=timestamp,
+            lat=lat,
+            lon=lon
         )
 
         print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
@@ -174,6 +232,14 @@ def recibir_datos():
             payload = nuevo_dato.to_dict()
             # Emitir a todos los clientes conectados
             socketio.emit('nuevo_dato', payload)
+            # Si trae ubicación, emitir evento específico de ubicación
+            if payload.get('lat') is not None and payload.get('lon') is not None and payload.get('nodeId'):
+                socketio.emit('ubicacion_nodo', {
+                    'nodeId': payload.get('nodeId'),
+                    'lat': payload.get('lat'),
+                    'lon': payload.get('lon'),
+                    'fecha': payload.get('fecha_creacion')
+                })
         except Exception as _e:
             print(f"Advertencia: no se pudo emitir por SocketIO: {_e}")
 
@@ -208,7 +274,8 @@ def handle_connect():
         ultimos_datos = obtener_todos_datos(limit=10)
         emit('datos_iniciales', {
             'datos': [dato.to_dict() for dato in ultimos_datos],
-            'mensaje': f'Conectado al servidor AgroLink. {len(ultimos_datos)} registros enviados.'
+            'mensaje': f'Conectado al servidor AgroLink. {len(ultimos_datos)} registros enviados.',
+            'gateway_ip': get_gateway_ip()
         })
     except Exception as e:
         emit('error', {'mensaje': f'Error al obtener datos iniciales: {str(e)}'})

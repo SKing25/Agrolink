@@ -64,6 +64,8 @@
             <h1>Bienvenido a AgroLink</h1>
             <p>Proximamente mas info ;)</p>
 
+            <div class="status-bar" id="gatewayStatus">Gateway IP: <strong id="gatewayIP">{{ gateway_ip or '—' }}</strong></div>
+
             {% if mapa %}
             <h2>Ubicación de Nodos</h2>
             <div class="map-container">
@@ -139,6 +141,24 @@
         });
     }
 })();
+    </script>
+
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script>
+        const socket = io(window.location.origin, { transports: ['polling'] });
+        const ipEl = document.getElementById('gatewayIP');
+
+        socket.on('datos_iniciales', (payload) => {
+            if (payload && payload.gateway_ip !== undefined && ipEl) {
+                ipEl.textContent = payload.gateway_ip || '—';
+            }
+        });
+
+        socket.on('gateway_ip', (data) => {
+            if (ipEl && data && 'ip' in data) {
+                ipEl.textContent = data.ip || '—';
+            }
+        });
     </script>
 </body>
 

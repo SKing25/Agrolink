@@ -4,7 +4,7 @@ Contiene modelos SQLAlchemy y funciones de acceso a datos
 """
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 db = SQLAlchemy()
 
@@ -19,6 +19,10 @@ class DatosSensor(db.Model):
     soil_moisture = db.Column(db.Float, nullable=True)  # Humedad del suelo
     light = db.Column(db.Float, nullable=True)  # Nivel de luz
     percentage = db.Column(db.Float, nullable=True)  # Porcentaje de luz
+    # Nuevos campos de ubicación
+    lat = db.Column(db.Float, nullable=True)
+    lon = db.Column(db.Float, nullable=True)
+
     nodeId = db.Column(db.String(50), nullable=True)
     timestamp = db.Column(db.Integer, nullable=True)
     fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -43,20 +47,66 @@ class DatosSensor(db.Model):
             resultado['light'] = float(self.light)
         if self.percentage is not None:
             resultado['percentage'] = float(self.percentage)
+        if self.lat is not None:
+            resultado['lat'] = float(self.lat)
+        if self.lon is not None:
+            resultado['lon'] = float(self.lon)
 
         return resultado
+
+
+class GatewayInfo(db.Model):
+    """Estado simple de la gateway (por ahora solo IP). Usar un único registro."""
+    id = db.Column(db.Integer, primary_key=True)
+    ip = db.Column(db.String(100), nullable=True)
+    actualizado_en = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 # ==================== FUNCIONES DE ACCESO A DATOS ====================
 
 def inicializar_db(app):
-    """Inicializa la base de datos con la aplicación Flask"""
+    """Inicializa la base de datos con la aplicación Flask y asegura columnas nuevas si faltan"""
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        _asegurar_columnas_nuevas()
+        _asegurar_gateway_row()
 
 
-def guardar_dato_sensor(temperatura=None, humedad=None, soil_moisture=None, light=None, percentage=None, node_id='unknown', timestamp=None):
+def _asegurar_columnas_nuevas():
+    """Intenta añadir columnas nuevas en SQLite si la tabla ya existía sin ellas."""
+    try:
+        # Comprobar columnas existentes
+        cols = db.session.execute(text("PRAGMA table_info(datos_sensor)")).fetchall()
+        nombres = {c[1] for c in cols}  # c[1] = name
+        alterados = False
+        if 'lat' not in nombres:
+            db.session.execute(text("ALTER TABLE datos_sensor ADD COLUMN lat FLOAT"))
+            alterados = True
+        if 'lon' not in nombres:
+            db.session.execute(text("ALTER TABLE datos_sensor ADD COLUMN lon FLOAT"))
+            alterados = True
+        if alterados:
+            db.session.commit()
+    except Exception:
+        # Silenciar: si falla es porque ya existen o no es SQLite compatible.
+        db.session.rollback()
+
+
+def _asegurar_gateway_row():
+    """Garantiza que exista un único registro GatewayInfo con id=1."""
+    try:
+        existe = GatewayInfo.query.get(1)
+        if not existe:
+            g = GatewayInfo(id=1, ip=None)
+            db.session.add(g)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def guardar_dato_sensor(temperatura=None, humedad=None, soil_moisture=None, light=None, percentage=None,
+                        node_id='unknown', timestamp=None, lat=None, lon=None):
     """
     Guarda un nuevo dato de sensor en la base de datos
     
@@ -68,7 +118,9 @@ def guardar_dato_sensor(temperatura=None, humedad=None, soil_moisture=None, ligh
         percentage: Porcentaje luz o None
         node_id: ID del nodo sensor
         timestamp: Timestamp Unix (opcional)
-    
+        lat: Latitud (opcional)
+        lon: Longitud (opcional)
+
     Returns:
         DatosSensor: El objeto guardado
     
@@ -85,6 +137,8 @@ def guardar_dato_sensor(temperatura=None, humedad=None, soil_moisture=None, ligh
         soil_val = float(soil_moisture) if soil_moisture is not None else None
         light_val = float(light) if light is not None else None
         percentage = float(percentage) if percentage is not None else None
+        lat_val = float(lat) if lat is not None else None
+        lon_val = float(lon) if lon is not None else None
 
         nuevo_dato = DatosSensor(
             temperatura=temp_val,
@@ -92,6 +146,8 @@ def guardar_dato_sensor(temperatura=None, humedad=None, soil_moisture=None, ligh
             soil_moisture=soil_val,
             light=light_val,
             percentage=percentage,
+            lat=lat_val,
+            lon=lon_val,
             nodeId=node_id,
             timestamp=timestamp
         )
@@ -223,12 +279,9 @@ def obtener_ultimo_dato(node_id=None):
 
 def obtener_nodos_unicos():
     """
-    Obtiene lista de IDs de nodos únicos
-    
-    Returns:
-        list: Lista de strings con IDs de nodos
+    Obtiene lista de IDs de nodos únicos (excluye el id especial 'gateway')
     """
-    return [row[0] for row in db.session.query(DatosSensor.nodeId).distinct().order_by(DatosSensor.nodeId.asc()).all() if row[0]]
+    return [row[0] for row in db.session.query(DatosSensor.nodeId).distinct().order_by(DatosSensor.nodeId.asc()).all() if row[0] and row[0].lower() != 'gateway']
 
 
 def obtener_campos_nodo(node_id):
@@ -292,3 +345,45 @@ def eliminar_dato(dato_id):
     except Exception as e:
         db.session.rollback()
         raise e
+
+
+# ==================== Ubicación por nodo ====================
+
+def obtener_ultima_ubicacion(node_id):
+    """Devuelve la última (lat, lon, fecha) para un nodo si existe."""
+    ultimo = DatosSensor.query.filter(
+        DatosSensor.nodeId == node_id,
+        DatosSensor.lat.isnot(None),
+        DatosSensor.lon.isnot(None)
+    ).order_by(DatosSensor.fecha_creacion.desc()).first()
+    if not ultimo:
+        return None
+    return {
+        'lat': float(ultimo.lat) if ultimo.lat is not None else None,
+        'lon': float(ultimo.lon) if ultimo.lon is not None else None,
+        'fecha': ultimo.fecha_creacion.strftime('%Y-%m-%d %H:%M:%S %Z') if ultimo.fecha_creacion else None
+    }
+
+
+# ==================== Gateway IP ====================
+
+def set_gateway_ip(ip: str):
+    """Actualiza/establece la IP de la gateway (registro único id=1)."""
+    try:
+        g = GatewayInfo.query.get(1)
+        if not g:
+            g = GatewayInfo(id=1, ip=ip)
+            db.session.add(g)
+        else:
+            g.ip = ip
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        return False
+
+
+def get_gateway_ip():
+    """Obtiene la IP de la gateway o None."""
+    g = GatewayInfo.query.get(1)
+    return g.ip if g else None
