@@ -31,6 +31,32 @@ inicializar_db(app)
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
 
+# Helper: normalizar posibles valores numéricos o strings como 'no data' a float/None
+def _parse_maybe_float(val):
+    """
+    Convierte a float si es posible.
+    Si el valor es None devuelve None.
+    Si el valor es una cadena que equivale a "no data", "none", "", "null" devuelve None.
+    Si la cadena puede convertirse a float, devuelve el float.
+    En cualquier otro caso devuelve None.
+    """
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        try:
+            return float(val)
+        except Exception:
+            return None
+    if isinstance(val, str):
+        s = val.strip().lower()
+        if s in ('no data', 'nodata', 'none', '', 'null'):
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+    return None
+
 # ==================== RUTAS HTTP ====================
 
 @app.route('/')
@@ -137,58 +163,40 @@ def recibir_datos():
         if 'temperatura' not in data:
             for alt in ('temperature', 'temp', 't'):
                 if alt in data:
-                    try:
-                        data['temperatura'] = float(data.pop(alt))
-                    except Exception:
-                        data.setdefault('temperatura', data.pop(alt))
+                    data['temperatura'] = _parse_maybe_float(data.pop(alt))
                     break
 
         # Normalizar humedad (aire)
         if 'humedad' not in data:
             for alt in ('humidity', 'hum', 'h'):
                 if alt in data:
-                    try:
-                        data['humedad'] = float(data.pop(alt))
-                    except Exception:
-                        data.setdefault('humedad', data.pop(alt))
+                    data['humedad'] = _parse_maybe_float(data.pop(alt))
                     break
 
         # Normalizar luz
         if 'light' not in data:
             for alt in ('luz', 'lux', 'l'):
                 if alt in data:
-                    try:
-                        data['light'] = float(data.pop(alt))
-                    except Exception:
-                        data.setdefault('light', data.pop(alt))
+                    data['light'] = _parse_maybe_float(data.pop(alt))
                     break
 
         # Normalizar porcentaje de luz
         if 'percentage' not in data:
             for alt in ('luz_porcentaje', 'light_percentage', 'porcentaje', 'pct'):
                 if alt in data:
-                    try:
-                        data['percentage'] = float(data.pop(alt))
-                    except Exception:
-                        data.setdefault('percentage', data.pop(alt))
+                    data['percentage'] = _parse_maybe_float(data.pop(alt))
                     break
 
         # Normalizar lat/lon
         if 'lat' not in data:
             for alt in ('latitude', 'latitud', 'y'):
                 if alt in data:
-                    try:
-                        data['lat'] = float(data.pop(alt))
-                    except Exception:
-                        data.setdefault('lat', data.pop(alt))
+                    data['lat'] = _parse_maybe_float(data.pop(alt))
                     break
         if 'lon' not in data:
             for alt in ('longitude', 'longitud', 'lng', 'x'):
                 if alt in data:
-                    try:
-                        data['lon'] = float(data.pop(alt))
-                    except Exception:
-                        data.setdefault('lon', data.pop(alt))
+                    data['lon'] = _parse_maybe_float(data.pop(alt))
                     break
 
         # Normalizar IP de la gateway
