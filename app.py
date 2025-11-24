@@ -159,45 +159,28 @@ def recibir_datos():
             else:
                 return jsonify({"status": "error", "mensaje": "IP vacía"}), 400
 
-        # Normalizar nombres de campos - temperatura
-        if 'temperatura' not in data:
-            for alt in ('temperature', 'temp', 't'):
-                if alt in data:
-                    data['temperatura'] = _parse_maybe_float(data.pop(alt))
-                    break
+        # ==== Normalización avanzada de campos ====
+        campos_alias = {
+            'temperatura': ('temperature', 'temp', 't'),
+            'humedad': ('humidity', 'hum', 'h'),
+            'light': ('luz', 'lux', 'l'),
+            'percentage': ('luz_porcentaje', 'light_percentage', 'porcentaje', 'pct'),
+            'lat': ('latitude', 'latitud', 'y'),
+            'lon': ('longitude', 'longitud', 'lng', 'x')
+        }
 
-        # Normalizar humedad (aire)
-        if 'humedad' not in data:
-            for alt in ('humidity', 'hum', 'h'):
-                if alt in data:
-                    data['humedad'] = _parse_maybe_float(data.pop(alt))
-                    break
+        for canon, aliases in campos_alias.items():
+            if canon in data:  # Si ya viene el nombre canónico, parsearlo igual
+                data[canon] = _parse_maybe_float(data[canon])
+            else:  # Buscar alias
+                for alt in aliases:
+                    if alt in data:
+                        data[canon] = _parse_maybe_float(data.pop(alt))
+                        break
 
-        # Normalizar luz
-        if 'light' not in data:
-            for alt in ('luz', 'lux', 'l'):
-                if alt in data:
-                    data['light'] = _parse_maybe_float(data.pop(alt))
-                    break
-
-        # Normalizar porcentaje de luz
-        if 'percentage' not in data:
-            for alt in ('luz_porcentaje', 'light_percentage', 'porcentaje', 'pct'):
-                if alt in data:
-                    data['percentage'] = _parse_maybe_float(data.pop(alt))
-                    break
-
-        # Normalizar lat/lon
-        if 'lat' not in data:
-            for alt in ('latitude', 'latitud', 'y'):
-                if alt in data:
-                    data['lat'] = _parse_maybe_float(data.pop(alt))
-                    break
-        if 'lon' not in data:
-            for alt in ('longitude', 'longitud', 'lng', 'x'):
-                if alt in data:
-                    data['lon'] = _parse_maybe_float(data.pop(alt))
-                    break
+        # soil_moisture no tenía alias aún; por si llega como string
+        if 'soil_moisture' in data:
+            data['soil_moisture'] = _parse_maybe_float(data['soil_moisture'])
 
         # Normalizar IP de la gateway
         gateway_ip_payload = None
@@ -221,7 +204,6 @@ def recibir_datos():
         if gateway_ip_payload and all(v is None for v in [temperatura, humedad, soil_moisture, light, percentage, lat, lon, timestamp]):
             ok = set_gateway_ip(gateway_ip_payload)
             if ok:
-                # Emitir a todos los clientes la IP actualizada
                 try:
                     socketio.emit('gateway_ip', {'ip': gateway_ip_payload})
                 except Exception:
@@ -230,7 +212,6 @@ def recibir_datos():
             else:
                 return jsonify({"status": "error", "mensaje": "No se pudo actualizar la Gateway IP"}), 500
 
-        # Guardar en base de datos usando la función del módulo database
         nuevo_dato = guardar_dato_sensor(
             temperatura=temperatura,
             humedad=humedad,
@@ -245,7 +226,6 @@ def recibir_datos():
 
         print(f"Dato guardado en BD: ID={nuevo_dato.id}")  # Debug
 
-        # Emitir evento en tiempo real a todos los clientes conectados
         try:
             payload = nuevo_dato.to_dict()
             socketio.emit('nuevo_dato', payload)
