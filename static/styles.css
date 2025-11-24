@@ -577,4 +577,106 @@ tr:hover td { color: var(--text-color); }
   width: 100% !important;
 }
 
+/* ========================= Dashboard (Index) ========================= */
+.dashboard-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill,minmax(180px,1fr));
+  margin: 20px 0 10px;
+}
+.metric-card {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all .3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.metric-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(115,198,182,0.12), rgba(133,193,233,0.12));
+  opacity: 0; transition: opacity .35s ease;
+}
+.metric-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+.metric-card:hover::before { opacity: 1; }
+.metric-card h3 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin: 0;
+  text-transform: uppercase;
+  color: var(--text-light);
+  letter-spacing: .5px;
+}
+.metric-card .value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-color);
+}
+.metric-card .sub {
+  font-size: 0.65rem;
+  color: var(--text-light);
+  letter-spacing: .5px;
+}
+.section-title {
+  margin: 30px 0 10px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+.mini-charts {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill,minmax(220px,1fr));
+}
+.mini-chart {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+  transition: all .3s ease;
+  /* Ajuste para que no se expanda infinito */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+}
+.mini-chart:hover { box-shadow: var(--shadow-hover); transform: translateY(-3px); }
+.mini-chart h4 {
+  margin: 0 0 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-light);
+}
+.mini-chart .avg-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--text-color);
+  letter-spacing: .5px;
+}
+.mini-chart canvas {
+  width: 100% !important;
+  height: 70px !important; /* altura controlada para sparkline */
+  max-width: 100%;
+}
+.time-local { font-variant-numeric: tabular-nums; }
+.map-wrapper { margin-top: 24px; }
+
+/* ========================= Responsive ajustes dashboard ========================= */
+@media (max-width: 600px){
+  .metric-card .value { font-size: 1.15rem; }
+  .dashboard-grid { grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); }
+  .mini-charts { grid-template-columns: 1fr; }
+}
+
 /* Fin de styles.css */

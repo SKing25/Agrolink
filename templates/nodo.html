@@ -199,8 +199,8 @@
         const current = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
         const next = current === 'dark' ? 'light' : 'dark';
         applyTheme(next);
-        try { 
-            localStorage.setItem(STORAGE_KEY, next); 
+        try {
+            localStorage.setItem(STORAGE_KEY, next);
         } catch (e) {
             console.warn('No se pudo guardar la preferencia del tema:', e);
         }
@@ -215,7 +215,7 @@
             e.preventDefault();
             toggleTheme();
         });
-        
+
         themeSwitch.addEventListener('keydown', function (e) {
             if (e.key === ' ' || e.key === 'Enter') {
                 e.preventDefault();

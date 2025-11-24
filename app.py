@@ -17,7 +17,6 @@ from database import (
     set_gateway_ip,
     get_gateway_ip
 )
-import folium  # Reimportado para crear_mapa en la página principal
 
 app = Flask(__name__)
 
@@ -31,12 +30,6 @@ inicializar_db(app)
 # Forzar modo threading para evitar cargar eventlet/gevent (corrige error ssl.wrap_socket)
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
-# PROBANDO MAPITA
-def crear_mapa(latitud, longitud):
-    m = folium.Map(location=[latitud, longitud], zoom_start=20)
-    folium.Marker([latitud, longitud], popup='La checho').add_to(m)
-    return m._repr_html_()
-
 
 # ==================== RUTAS HTTP ====================
 
@@ -46,13 +39,11 @@ def home():
         total_registros = contar_registros()
         ultimo_dato = obtener_ultimo_dato()
         nodos = obtener_nodos_unicos()
-        mapa_html = crear_mapa(4.660753, -74.059945)  # PROBANDO MAPITA
         gateway_ip = get_gateway_ip()
         return render_template('index.html',
                                total_registros=total_registros,
                                ultimo_dato=ultimo_dato,
                                nodos=nodos,
-                               mapa=mapa_html, # PROBANDO MAPITA
                                gateway_ip=gateway_ip
                                )
 

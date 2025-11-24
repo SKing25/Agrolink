@@ -7,6 +7,7 @@
     <title>AgroLink</title>
     <link rel="icon" href="{{ url_for('static', filename='agrolink.png') }}" type="image/x-icon">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 
 <body>
@@ -28,24 +29,13 @@
                 </ul>
             </li>
         </ul>
-
-        <!-- Toggle de tema: colocado fuera del <ul> para mantener HTML válido -->
-        <!-- Toggle de tema - Versión simplificada -->
         <div class="theme-toggle">
             <button class="theme-switch" id="themeSwitch" aria-label="Cambiar tema">
                 <span class="icon icon-sun" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none">
                         <circle cx="12" cy="12" r="4" fill="currentColor" />
-                        <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"
-                            opacity="0.95">
-                            <path d="M12 2v2" />
-                            <path d="M12 20v2" />
-                            <path d="M4.22 4.22l1.42 1.42" />
-                            <path d="M18.36 18.36l1.42 1.42" />
-                            <path d="M2 12h2" />
-                            <path d="M20 12h2" />
-                            <path d="M4.22 19.78l1.42-1.42" />
-                            <path d="M18.36 5.64l1.42-1.42" />
+                        <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
+                            <path d="M12 2v2" /><path d="M12 20v2" /><path d="M4.22 4.22l1.42 1.42" /><path d="M18.36 18.36l1.42 1.42" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="M4.22 19.78l1.42-1.42" /><path d="M18.36 5.64l1.42-1.42" />
                         </g>
                     </svg>
                 </span>
@@ -60,25 +50,85 @@
     </nav>
 
     <main class="main-content">
-        <div class="card">
-            <h1>Bienvenido a AgroLink</h1>
-            <p>Proximamente mas info ;)</p>
-
-            <div class="status-bar" id="gatewayStatus">Gateway IP: <strong id="gatewayIP">{{ gateway_ip or '—' }}</strong></div>
-
-            {% if mapa %}
-            <h2>Ubicación de Nodos</h2>
-            <div class="map-container">
-                {{ mapa|safe }}
-            </div>
-            {% endif %}
+      <div class="card">
+        <h1>Panel General</h1>
+        <div class="flex-row">
+          <div class="status-bar" id="gatewayStatus">Gateway IP: <strong id="gatewayIP">{{ gateway_ip or '—' }}</strong></div>
         </div>
+
+        <!-- Tarjetas de métricas -->
+        <div class="dashboard-grid" id="metricsGrid">
+          <div class="metric-card" id="metricRegistros">
+            <h3>Registros</h3>
+            <div class="value">{{ total_registros or 0 }}</div>
+            <div class="sub">Total acumulado</div>
+          </div>
+          <div class="metric-card" id="metricNodos">
+            <h3>Nodos Activos</h3>
+            <div class="value">{{ nodos|length }}</div>
+            <div class="sub">Detectados</div>
+          </div>
+          <div class="metric-card" id="metricUltimo">
+            <h3>Último Dato</h3>
+            <div class="value time-local" {% if ultimo_dato and ultimo_dato.fecha_creacion %}{% set fc = ultimo_dato.fecha_creacion %}{% if fc.strftime is defined %}data-ts="{{ fc.strftime('%Y-%m-%dT%H:%M:%S') }}"{% else %}data-ts="{{ fc }}"{% endif %}{% endif %}>—</div>
+            <div class="sub">Hora local</div>
+          </div>
+        </div>
+
+        <!-- Últimos datos (vista rápida) -->
+        <h2 class="section-title">Últimos Datos</h2>
+        <table id="ultimos-datos-table">
+          <thead>
+            <tr><th>ID</th><th>Nodo</th><th>Temp(°C)</th><th>Hum(%)</th><th>Luz</th><th>Hora</th></tr>
+          </thead>
+          <tbody id="ultimosTbody">
+            {% if ultimo_dato %}
+              <tr>
+                <td>{{ ultimo_dato.id }}</td>
+                <td>{{ ultimo_dato.nodeId or '-' }}</td>
+                <td>{% if ultimo_dato.temperatura is not none %}{{ '%.1f'|format(ultimo_dato.temperatura) }}{% else %}-{% endif %}</td>
+                <td>{% if ultimo_dato.humedad is not none %}{{ '%.1f'|format(ultimo_dato.humedad) }}{% else %}-{% endif %}</td>
+                <td>{% if ultimo_dato.light is not none and ultimo_dato.percentage is not none %}{{ '%.2f'|format(ultimo_dato.light) }} - {{ '%.0f'|format(ultimo_dato.percentage) }}%{% elif ultimo_dato.light is not none %}{{ '%.2f'|format(ultimo_dato.light) }}{% elif ultimo_dato.percentage is not none %}{{ '%.0f'|format(ultimo_dato.percentage) }}%{% else %}-{% endif %}</td>
+                <td class="time-local" {% if ultimo_dato and ultimo_dato.fecha_creacion %}{% set fc = ultimo_dato.fecha_creacion %}{% if fc.strftime is defined %}data-ts="{{ fc.strftime('%Y-%m-%dT%H:%M:%S') }}"{% else %}data-ts="{{ fc }}"{% endif %}{% endif %}>—</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6">No hay datos aún</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+
+        <!-- Mini gráficas (placeholders) -->
+        <h2 class="section-title">Resumen Rápido</h2>
+        <div class="mini-charts" id="miniCharts">
+          <div class="mini-chart" id="chartTempAvg"><h4>Temp Prom (acumulado)</h4><div class="avg-value" id="avgTemp">—</div><canvas id="sparkTemp"></canvas></div>
+          <div class="mini-chart" id="chartHumAvg"><h4>Hum Prom (acumulado)</h4><div class="avg-value" id="avgHum">—</div><canvas id="sparkHum"></canvas></div>
+          <div class="mini-chart" id="chartLightAvg"><h4>Luz Prom (acumulado)</h4><div class="avg-value" id="avgLight">—</div><canvas id="sparkLight"></canvas></div>
+          <div class="mini-chart" id="chartSueloAvg"><h4>Suelo Prom (acumulado)</h4><div class="avg-value" id="avgSoil">—</div><canvas id="sparkSoil"></canvas></div>
+        </div>
+
+        <!-- Mapa (si se decide mostrar en index más adelante) -->
+        <h2 class="section-title">Mapa de Nodos</h2>
+        <div class="map-container" style="height:420px">
+          <div id="index-map" style="width:100%; height:100%"></div>
+        </div>
+
+      </div>
     </main>
 
-    <script>window.PAGE_DATA = { gateway_ip: {{ (gateway_ip or 'null')|tojson }} };</script>
+    <script>window.PAGE_DATA = {
+      gateway_ip: {{ gateway_ip|default(None)|tojson }},
+      total_registros: {{ total_registros|default(0)|tojson }},
+      nodos: {{ nodos|default([])|tojson }},
+      ubicacionesTodos: {{ ubicaciones_todos|default({})|tojson }},
+      centroLat: {{ centro_lat|default(0)|tojson }},
+      centroLon: {{ centro_lon|default(0)|tojson }}
+    };</script>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='js/index.js') }}"></script>
 </body>
 
 </html>
+
