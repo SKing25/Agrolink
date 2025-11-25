@@ -730,4 +730,26 @@ tr:hover td { color: var(--text-color); }
   min-width: 300px;
 }
 
+/* Enlaces de nodos (forzar color según tema y evitar morado :visited) */
+#nodos-table a.link-nodo,
+#nodos-table a.link-nodo:visited,
+#nodos-table a.link-nodo:active,
+#nodos-table a.link-nodo:focus {
+  color: var(--text-color);
+}
+[data-theme="dark"] #nodos-table a.link-nodo,
+[data-theme="dark"] #nodos-table a.link-nodo:visited,
+.dark-mode #nodos-table a.link-nodo,
+.dark-mode #nodos-table a.link-nodo:visited {
+  color: var(--text-color); /* en modo oscuro var(--text-color) es claro */
+}
+#nodos-table a.link-nodo:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+a {
+  text-decoration: none;
+}
+
 /* Fin de styles.css */
