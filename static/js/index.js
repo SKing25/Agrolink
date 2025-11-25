@@ -144,6 +144,7 @@
         `<td>${dato.nodeId??'-'}</td>`+
         `<td>${dato.temperatura!=null?Number(dato.temperatura).toFixed(1):'-'}</td>`+
         `<td>${dato.humedad!=null?Number(dato.humedad).toFixed(1):'-'}</td>`+
+        `<td>${dato.soil_moisture!=null?Number(dato.soil_moisture).toFixed(1):'-'}</td>`+
         `<td>${(dato.light!=null&&dato.percentage!=null)?`${Number(dato.light).toFixed(2)} - ${Number(dato.percentage).toFixed(0)}%`:(dato.light!=null?Number(dato.light).toFixed(2):(dato.percentage!=null?Number(dato.percentage).toFixed(0)+'%':'-'))}</td>`+
         `<td class="time-local" data-ts="${dato.fecha_creacion??''}">${dato.fecha_creacion?toLocalTime(dato.fecha_creacion):'-'}</td>`;
       ultimosTbody.appendChild(tr);

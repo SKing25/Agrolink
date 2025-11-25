@@ -280,8 +280,22 @@ def obtener_ultimo_dato(node_id=None):
 def obtener_nodos_unicos():
     """
     Obtiene lista de IDs de nodos únicos (excluye el id especial 'gateway')
+    Normaliza los IDs eliminando duplicados por mayúsculas/minúsculas y espacios
     """
-    return [row[0] for row in db.session.query(DatosSensor.nodeId).distinct().order_by(DatosSensor.nodeId.asc()).all() if row[0] and row[0].lower() != 'gateway']
+    # Obtener todos los nodos distintos de la BD
+    nodos_raw = [row[0] for row in db.session.query(DatosSensor.nodeId).distinct().all() if row[0]]
+    
+    # Usar un set para evitar duplicados, normalizando espacios
+    nodos_set = set()
+    for nodo in nodos_raw:
+        # Limpiar espacios en blanco al inicio y final
+        nodo_limpio = str(nodo).strip()
+        # Excluir 'gateway' (case-insensitive)
+        if nodo_limpio and nodo_limpio.lower() != 'gateway':
+            nodos_set.add(nodo_limpio)
+    
+    # Convertir a lista ordenada
+    return sorted(list(nodos_set))
 
 
 def obtener_campos_nodo(node_id):

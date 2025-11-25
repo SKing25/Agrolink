@@ -679,4 +679,55 @@ tr:hover td { color: var(--text-color); }
   .mini-charts { grid-template-columns: 1fr; }
 }
 
+/* ========================= Sensor badges ========================= */
+.sensor-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  margin: 2px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(115, 198, 182, 0.15);
+  color: var(--text-color);
+  border: 1px solid rgba(115, 198, 182, 0.3);
+  transition: all 0.3s ease;
+}
+
+.sensor-badge:hover {
+  background: rgba(115, 198, 182, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(115, 198, 182, 0.3);
+}
+
+[data-theme="dark"] .sensor-badge,
+.dark-mode .sensor-badge {
+  background: rgba(79, 209, 197, 0.2);
+  border-color: rgba(79, 209, 197, 0.4);
+}
+
+[data-theme="dark"] .sensor-badge:hover,
+.dark-mode .sensor-badge:hover {
+  background: rgba(79, 209, 197, 0.3);
+}
+
+/* ========================= Nodos table specific styles ========================= */
+#nodos-table {
+  margin-top: 15px;
+}
+
+#nodos-table td:first-child {
+  font-weight: 600;
+  color: var(--primary-color);
+  width: 60px;
+}
+
+#nodos-table td:nth-child(2) {
+  font-weight: 600;
+  min-width: 120px;
+}
+
+#nodos-table td:nth-child(3) {
+  min-width: 300px;
+}
+
 /* Fin de styles.css */

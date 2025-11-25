@@ -66,13 +66,43 @@ def home():
         ultimo_dato = obtener_ultimo_dato()
         nodos = obtener_nodos_unicos()
         gateway_ip = get_gateway_ip()
+        # Construir mapping de sensores reales por nodo
+        nodos_sensores = {}
+        for n in nodos:
+            campos = obtener_campos_nodo(n)
+            etiquetas = []
+
+            if campos.get('temperatura'): etiquetas.append('Temperatura')
+            if campos.get('humedad'): etiquetas.append('Humedad')
+            if campos.get('soil_moisture'): etiquetas.append('Suelo')
+            if campos.get('light') and campos.get('percentage'):
+                etiquetas.append('Luz (lux, %)')
+            else:
+                if campos.get('light'): etiquetas.append('Luz')
+                elif campos.get('percentage'): etiquetas.append('Luz (%)')
+            nodos_sensores[n] = etiquetas if etiquetas else []
+        # Ubicaciones para mapa inicial
+        ubicaciones_todos = {}
+        for n in nodos:
+            loc = obtener_ultima_ubicacion(n)
+            if loc:
+                ubicaciones_todos[n] = loc
+        # Centro del mapa: usar primera ubicación válida o un default
+        if ubicaciones_todos:
+            primero = next(iter(ubicaciones_todos.values()))
+            centro_lat = primero.get('lat', 4.660753)
+            centro_lon = primero.get('lon', -74.059945)
+        else:
+            centro_lat, centro_lon = 4.660753, -74.059945
         return render_template('index.html',
                                total_registros=total_registros,
                                ultimo_dato=ultimo_dato,
                                nodos=nodos,
-                               gateway_ip=gateway_ip
-                               )
-
+                               gateway_ip=gateway_ip,
+                               nodos_sensores=nodos_sensores,
+                               ubicaciones_todos=ubicaciones_todos,
+                               centro_lat=centro_lat,
+                               centro_lon=centro_lon)
     except Exception as e:
         return f"Servidor AgroLink activo. Error: {str(e)}"
 
