@@ -7,17 +7,23 @@ Este proyecto implementa un sistema completo de Internet de las Cosas (IoT) para
 ## Arquitectura del Sistema
 
 ```
-[ESP32 DHT22] --> [Red Mesh] --> [ESP32 Gateway] --> [Mosquitto MQTT] --> [Puente Python] --> [Servidor Flask/Render]
+[ESP32 DHT22] --> [Red Mesh] --> [ESP32 Gateway] --> [WiFi AP/Hotspot] --> [Mosquitto MQTT] --> [Puente Python] --> [Servidor Flask/DigitalOcean]
+                                                           ↓
+                                                    [Computador Local]
 ```
 
-### Componentes principales:
-1. **Nodo Sensor (ESP32 + DHT22)**: Recolección de datos ambientales
-2. **Gateway ESP32**: Puente entre red mesh y conectividad externa
-3. **Broker MQTT (Mosquitto)**: Middleware de mensajería
-4. **Puente Python**: Procesamiento y reenvío de datos
-5. **Servidor Web Flask**: Almacenamiento y visualización de datos
+ 
 
 ## Conceptos Fundamentales
+
+### Access Point (Punto de Acceso WiFi)
+El Access Point o Hotspot del computador es el puente entre la red mesh local y la infraestructura de procesamiento:
+
+- **Función**: Crear una red WiFi local a la que el Gateway ESP32 puede conectarse
+- **Configuración en este proyecto**: "Laptop-Santiago" en banda 2.4GHz (ESP32 solo soporta 2.4GHz)
+- **IP asignada**: 10.42.0.1 (típicamente en Linux)
+- **Servicios hospedados**: Broker MQTT (Mosquitto), Puente Python
+- **Importancia crítica**: Sin el AP, el Gateway no puede comunicarse con Mosquitto
 
 ### Red Mesh
 Una red mesh es una topología de red donde cada nodo se conecta directamente con varios otros nodos, creando múltiples rutas para la transmisión de datos. En este proyecto:
@@ -404,17 +410,17 @@ dht22/
 **Duración**: ~200-1000 ms  
 **Tecnología**: HTTP/HTTPS sobre TCP/IP
 
-1. **Establecimiento de conexión**: TCP handshake con servidor Render
+1. **Establecimiento de conexión**: TCP handshake con el servidor desplegado en DigitalOcean
 2. **Negociación TLS**: Cifrado HTTPS para seguridad
 3. **Envío HTTP POST**: Datos JSON en body de request
 4. **Enrutamiento ISP**: Paso por múltiples routers hasta datacenter
-5. **Balanceador de carga**: Distribución en infraestructura Render
+5. **Balanceador de carga**: Distribución en la infraestructura de DigitalOcean (o tu propio proxy inverso si aplica)
 6. **Recepción en servidor**: Flask recibe request en endpoint `/datos`
 
 **Cabeceras HTTP**:
 ```http
 POST /datos HTTP/1.1
-Host: agrolink-hd2p.onrender.com
+Host: tu-droplet.dominio
 Content-Type: application/json
 Content-Length: 98
 
@@ -422,7 +428,7 @@ Content-Length: 98
 ```
 
 ### Etapa 8: Persistencia en Base de Datos
-**Ubicación**: Servidor Render (Cloud)  
+**Ubicación**: Droplet de DigitalOcean (Cloud)  
 **Duración**: ~50-200 ms  
 **Tecnología**: Flask + SQLAlchemy + SQLite
 
@@ -528,7 +534,7 @@ Este flujo demuestra la complejidad y elegancia de los sistemas IoT modernos, do
 
 #### 3. Mosquitto → Python → Nube
 ```
-[Mosquitto] ──(MQTT Subscribe)──→ [Python] ──(HTTP POST)──→ [Servidor Render]
+[Mosquitto] ──(MQTT Subscribe)──→ [Python] ──(HTTP POST)──→ [Servidor DigitalOcean]
 ```
 - **Mosquitto** recibe y organiza los datos MQTT por topics
 - **Código Python** se suscribe automáticamente a `dht22/datos/+`
@@ -540,7 +546,7 @@ Este flujo demuestra la complejidad y elegancia de los sistemas IoT modernos, do
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │ ESP32 DHT22 │    │ESP32 Gateway│    │ Computadora │    │   Python    │    │ Servidor    │
-│             │    │             │    │ (Mosquitto) │    │   Puente    │    │   Render    │
+│             │    │             │    │ (Mosquitto) │    │   Puente    │    │ DigitalOcean│
 │ 1. Captura ──┼────→ 2. Mesh    ──┼────→ 3. MQTT    ──┼────→ 4. HTTP   ──┼────→ 5. SQLite │
 │   DHT22     │    │   WiFi      │    │   Broker    │    │   Bridge    │    │   Flask     │
 └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
@@ -556,7 +562,7 @@ Este flujo demuestra la complejidad y elegancia de los sistemas IoT modernos, do
 2. **ESP32 Gateway**: Red mesh + WiFi "Laptop-Santiago" (conectividad dual)
 3. **Computadora**: WiFi "Laptop-Santiago" + Mosquitto en puerto 1883
 4. **Script Python**: Mismo equipo que Mosquitto + acceso a Internet
-5. **Servidor Render**: Accesible vía HTTPS desde Internet
+5. **Servidor DigitalOcean**: Accesible vía HTTPS desde Internet
 
 #### ❌ Lo que NO se requiere:
 - ESP32 DHT22 no necesita WiFi externo ni acceso a Internet
@@ -581,7 +587,7 @@ Este flujo demuestra la complejidad y elegancia de los sistemas IoT modernos, do
 1. **Gateway ESP32**: Punto único de fallo entre mesh y exterior
 2. **Conectividad WiFi**: Ambos (Gateway y PC) deben estar en misma red
 3. **Mosquitto**: Debe estar ejecutándose antes que el script Python
-4. **Internet**: Requerido solo para envío final a Render
+4. **Internet**: Requerido solo para envío final al droplet en DigitalOcean
 
 Este diseño proporciona una arquitectura escalable donde cada componente tiene responsabilidades específicas y bien definidas.
 
@@ -600,7 +606,7 @@ Este diseño proporciona una arquitectura escalable donde cada componente tiene 
 ### Seguridad
 - Contraseña para red mesh
 - Comunicación local para MQTT
-- HTTPS para servidor remoto (Render)
+- HTTPS para servidor remoto en DigitalOcean
 
 ### Eficiencia Energética
 - Transmisión cada 10 segundos (configurable)
@@ -771,7 +777,7 @@ import time
 BROKER = "localhost"
 PORT = 1883
 TOPIC = "dht22/datos/+"
-SERVER_URL = "https://agrolink-hd2p.onrender.com/datos"
+SERVER_URL = "https://tu-droplet.dominio/datos"
 
 # Código completo del puente...
 ```
@@ -786,7 +792,7 @@ python3 puente.py
 # 📡 Suscrito al tópico: dht22/datos/+
 # 📥 Mensaje de dht22/datos/2123456789: {"temperature":22.7,"humidity":54.2}
 # 🔄 Datos parseados: {...}
-# ✅ Datos enviados al servidor Render
+# ✅ Datos enviados al servidor en DigitalOcean
 ```
 
 ### Paso 5: Desarrollo y Despliegue del Servidor Flask
@@ -815,19 +821,28 @@ db = SQLAlchemy(app)
 
 2. Crear `templates/dht22.html` para visualización web
 
-#### 5.3 Despliegue en Render
-1. Crear cuenta en [Render.com](https://render.com)
-2. Conectar repositorio GitHub con el código
-3. Configurar Web Service:
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `python app.py`
-   - **Environment**: Python 3
-4. Desplegar y obtener URL pública
+#### 5.3 Despliegue en DigitalOcean
+1. Crear un Droplet (ej. Ubuntu 22.04, 1 vCPU/1GB) y asignarle un dominio o usar la IP pública.
+2. Conectarse vía SSH e instalar dependencias básicas:
+   ```bash
+   sudo apt update && sudo apt install python3 python3-venv python3-pip nginx -y
+   ```
+3. Clonar el repositorio o copiar el código del servidor al droplet.
+4. Crear y activar un entorno virtual, luego instalar requisitos:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+5. Opcional: Configurar Gunicorn y Nginx para exponer el servicio Flask de forma segura:
+   - Gunicorn: `gunicorn --bind 0.0.0.0:8000 app:app`
+   - Nginx: proxy inverso que escuche en el puerto 80/443 y redirija a Gunicorn.
+6. Proteger el servicio con firewall (`ufw allow 'Nginx Full'`) y certificados TLS (Let’s Encrypt) si se expone vía HTTPS.
 
 #### 5.4 Actualización del Puente Python
 ```python
 # Actualizar URL en puente.py
-SERVER_URL = "https://tu-app-name.onrender.com/datos"
+SERVER_URL = "https://tu-droplet.dominio/datos"
 ```
 
 ### Paso 6: Verificación del Sistema Completo
@@ -848,7 +863,7 @@ ping 10.42.0.1
 mosquitto_sub -h localhost -t "dht22/datos/+" -v
 
 # Verificar servidor remoto
-curl -X GET https://tu-app.onrender.com/api/datos
+curl -X GET https://tu-droplet.dominio/api/datos
 
 # Verificar logs del puente
 python3 puente.py
@@ -865,7 +880,7 @@ python3 puente.py
 - **ESP32**: Usar Serial Monitor para ver estado de conexiones
 - **Mosquitto**: Logs en `/var/log/mosquitto/mosquitto.log`
 - **Python**: Agregar logging detallado para troubleshooting
-- **Render**: Usar dashboard de Render para monitoreo del servidor
+- **DigitalOcean**: Supervisar métricas del droplet (CPU, RAM, red) y revisar logs con `journalctl` o los registros de Gunicorn/Nginx
 
 #### 7.2 Posibles Problemas y Soluciones
 | Problema | Causa Probable | Solución |
@@ -873,7 +888,7 @@ python3 puente.py
 | No hay datos en web | Puente Python no corriendo | Reiniciar `python3 puente.py` |
 | Gateway no conecta | WiFi incorrecto | Verificar credenciales y hotspot |
 | Mesh no funciona | Configuraciones diferentes | Verificar MESH_PREFIX y PASSWORD |
-| Servidor no responde | Render en sleep mode | Hacer request para "despertar" |
+| Servidor no responde | Gunicorn/Nginx detenido o droplet sin recursos | Revisar servicios (`sudo systemctl status`) y reiniciar si es necesario |
 
 ### Cronograma de Implementación
 
@@ -884,3 +899,73 @@ python3 puente.py
 - **Día 5**: Integración y pruebas (Pasos 6-7)
 
 Este cronograma asume familiaridad básica con las tecnologías involucradas y puede ajustarse según la experiencia del implementador.
+
+## Extensión: Comandos Telnet (Diagnóstico y Ping)
+
+El Gateway expone un mini shell Telnet en el puerto 23. Desde ahí se puede diagnosticar la red mesh, revisar el estado MQTT e iniciar pruebas de ping (directas o delegadas a otros nodos).
+
+### Comandos Disponibles Clave
+- `help`: Lista todos los comandos registrados en el shell.
+- `status`: Resume el estado actual del gateway (ID, IP, nodos conectados, estado MQTT).
+- `nodes`: Muestra los nodos detectados y la información de sensor cacheada. Usa `nodes refresh` para forzar que todos los nodos publiquen su `INFO` nuevamente.
+- `ping <dest>`: El gateway hace ping directo al nodo indicado. `ping <origen> <dest>` ordena a un nodo del mesh que haga ping a otro nodo y reporte el RTT.
+- `mqtt`: Imprime la configuración del broker y si la sesión está conectada.
+- `mesh`: Indica parámetros de la red mesh y cantidad de nodos conectados.
+- `led on|off`: Control remoto del LED de estado del gateway.
+- `reboot`: Reinicia el ESP32 Gateway.
+
+### Mensajes de Control (Formato JSON)
+```json
+// PING directo del gateway hacia un nodo
+{"type":"PING","from":123456,"to":987654,"seq":42}
+
+// Comando para que un nodo origine un ping hacia otro nodo
+{"type":"PING_CMD","from":111111,"to":222222,"seq":42}
+
+// Respuesta de ping. Si incluye RTT, proviene del nodo que ejecutó el ping delegado
+{"type":"PONG","from":222222,"to":111111,"seq":42,"rtt":87}
+
+// Solicitud de información de nodo (emitida por `nodes refresh`)
+{"type":"INFO_REQ"}
+
+// Respuesta con datos de identificación del nodo
+{"type":"INFO","node_type":"Nodo Luz","sensors":"TEMT6000 + GPS"}
+```
+
+### Cambios Requeridos en Cada Nodo (excepto Gateway)
+Los nodos deben reconocer los mensajes anteriores para poder colaborar en diagnósticos. El patrón implementado es el siguiente:
+```cpp
+StaticJsonDocument<512> doc;
+if (deserializeJson(doc, msg) == DeserializationError::Ok && doc.containsKey("type")) {
+   String type = doc["type"].as<String>();
+   uint32_t myId = mesh.getNodeId();
+
+   if (type == "PING_CMD" && doc["from"].as<uint32_t>() == myId) {
+      // Iniciar ping delegado y recordar el estado local para reportar RTT
+   } else if (type == "PING" && doc["to"].as<uint32_t>() == myId) {
+      // Responder con PONG inmediatamente
+   } else if (type == "PONG" && pendingPing.active && doc["seq"].as<uint32_t>() == pendingPing.seq) {
+      // Calcular RTT y reportarlo de vuelta en un PONG con campo rtt
+   } else if (type == "INFO_REQ") {
+      // Publicar broadcast con {"type":"INFO", "node_type":..., "sensors":...}
+   }
+}
+```
+En el repositorio cada variante de nodo ya incluye la lógica completa para gestionar `PING_CMD`, `PING`, `PONG` e `INFO_REQ`, además de un temporizador de 5 s para cancelar pings pendientes.
+
+### Interpretación de Resultados
+- El comando `nodes` usa la caché local. Si un nodo aparece como "Desconocido", ejecuta `nodes refresh` y espera la respuesta `INFO`.
+- Los pings directos (gateway → nodo) calculan RTT en el gateway. Los pings delegados reportan el RTT medido por el nodo origen.
+- Un timeout tras 5 s implica pérdida del PONG o que el nodo destino no está alcanzable.
+
+### Buenas Prácticas
+1. Evita bombardear la red con `ping`; deja pasar unos segundos entre pruebas para no congestionar el mesh.
+2. Mantén los mensajes de control ligeros (≤256 bytes) para no fragmentar paquetes.
+3. Si amplías el protocolo, añade un campo `protoVersion` para preservar compatibilidad hacia atrás.
+
+### Próximas Extensiones Posibles
+- Métricas adicionales en `INFO` (ej. batería, uptime).
+- Ping encadenado multi-salto para medir rutas completas.
+- Historial de ping almacenado en el gateway para análisis posterior.
+
+Para implementar cualquiera de estas extensiones, solicita la especificación y se puede ampliar el protocolo actual.
