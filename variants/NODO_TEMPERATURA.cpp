@@ -45,95 +45,110 @@ Task taskSendData(TASK_SECOND * 10, TASK_FOREVER, []() {
   }
 });
 
+// Variables para manejar ping entre nodos
+struct PendingPing {
+  uint32_t targetNode;
+  uint32_t seq;
+  unsigned long sentTime;
+  bool active;
+};
+
+PendingPing nodePing = {0, 0, 0, false};
+
 void receivedCallback(uint32_t from, String &msg) {
-  // Debug crudo de mensaje recibido
   Serial.printf("[RX] de %u: %s\n", from, msg.c_str());
   
-  // Intentar parsear como JSON de control
   StaticJsonDocument<512> doc;
   DeserializationError err = deserializeJson(doc, msg);
   
-  if (err == DeserializationError::Ok) {
-    const char* type = doc["type"];
-    if (type) {
-      // PING: responder con PONG si dirigido a este nodo
-      if (strcmp(type, "PING") == 0) {
-        uint32_t to = doc["to"].as<uint32_t>();
-        uint32_t seq = doc["seq"].as<uint32_t>();
-        uint32_t requester = doc["from"].as<uint32_t>();
-        uint32_t myId = mesh.getNodeId();
-        
-        if (to == myId) {
-          StaticJsonDocument<128> pong;
-          pong["type"] = "PONG";
-          pong["seq"] = seq;
-          pong["from"] = myId;
-          String out;
-          serializeJson(pong, out);
-          mesh.sendSingle(requester, out);
-          Serial.printf("[PING] seq=%u de %u -> PONG enviado\n", seq, requester);
-        }
-        return;
-      }
+  if (err == DeserializationError::Ok && doc.containsKey("type")) {
+    String msgType = doc["type"].as<String>();
+    uint32_t myId = mesh.getNodeId();
+    
+    // PING_CMD: Gateway ordena hacer ping a otro nodo
+    if (msgType == "PING_CMD") {
+      uint32_t sourceNode = doc["from"].as<uint32_t>();
+      uint32_t targetNode = doc["to"].as<uint32_t>();
+      uint32_t seq = doc["seq"].as<uint32_t>();
       
-      // TOPO_REQ: responder con lista de vecinos
-      else if (strcmp(type, "TOPO_REQ") == 0) {
-        uint32_t requester = doc["from"].as<uint32_t>();
-        auto list = mesh.getNodeList();
-        StaticJsonDocument<256> topo;
-        topo["type"] = "TOPO";
-        JsonArray arr = topo.createNestedArray("neighbors");
-        for (auto id : list) arr.add(id);
+      // Solo procesar si soy el nodo origen
+      if (sourceNode == myId) {
+        if (nodePing.active) {
+          Serial.println("[PING_CMD] Ya hay un ping pendiente, ignorado");
+          return;
+        }
+        
+        // Iniciar ping al nodo destino
+        nodePing.targetNode = targetNode;
+        nodePing.seq = seq;
+        nodePing.sentTime = millis();
+        nodePing.active = true;
+        
+        StaticJsonDocument<128> pingMsg;
+        pingMsg["type"] = "PING";
+        pingMsg["from"] = myId;
+        pingMsg["to"] = targetNode;
+        pingMsg["seq"] = seq;
+        
         String out;
-        serializeJson(topo, out);
-        mesh.sendSingle(requester, out);
-        Serial.printf("[TOPO_REQ] de %u -> TOPO enviado (%d vecinos)\n", requester, list.size());
-        return;
-      }
-      
-      // PONG: normalmente el nodo no inicia pings, solo log
-      else if (strcmp(type, "PONG") == 0) {
-        uint32_t seq = doc["seq"].as<uint32_t>();
-        Serial.printf("[PONG] Recibido seq=%u desde %u\n", seq, from);
-        return;
-      }
-      
-      // TRACE: agregar mi ID a la ruta y responder o reenviar
-      else if (strcmp(type, "TRACE") == 0) {
-        uint32_t to = doc["to"].as<uint32_t>();
-        uint32_t seq = doc["seq"].as<uint32_t>();
-        uint32_t originator = doc["from"].as<uint32_t>();
-        uint32_t myId = mesh.getNodeId();
+        serializeJson(pingMsg, out);
+        mesh.sendBroadcast(out);
         
-        // Agregar mi ID al array de hops
-        JsonArray hops = doc["hops"].as<JsonArray>();
-        hops.add(myId);
-        
-        if (to == myId) {
-          // Soy el destino: responder con TRACE_REPLY
-          StaticJsonDocument<384> reply;
-          reply["type"] = "TRACE_REPLY";
-          reply["seq"] = seq;
-          reply["from"] = myId;
-          JsonArray replyHops = reply.createNestedArray("hops");
-          for(uint32_t hop : hops) replyHops.add(hop);
-          String out;
-          serializeJson(reply, out);
-          mesh.sendSingle(originator, out);
-          Serial.printf("[TRACE] Destino alcanzado seq=%u, TRACE_REPLY enviado a %u\n", seq, originator);
-        } else {
-          // Soy intermediario: reenviar con mi hop agregado
-          String out;
-          serializeJson(doc, out);
-          mesh.sendSingle(to, out);
-          Serial.printf("[TRACE] Reenviado seq=%u hacia %u (saltos=%d)\n", seq, to, hops.size());
-        }
-        return;
+        Serial.printf("[PING_CMD] Haciendo PING a nodo %u (seq=%u)\n", targetNode, seq);
       }
+      return;
+    }
+    
+    // PING: Responder con PONG si es para mí
+    if (msgType == "PING") {
+      uint32_t targetNode = doc["to"].as<uint32_t>();
+      uint32_t sourceNode = doc["from"].as<uint32_t>();
+      uint32_t seq = doc["seq"].as<uint32_t>();
+      
+      if (targetNode == myId) {
+        StaticJsonDocument<128> pongMsg;
+        pongMsg["type"] = "PONG";
+        pongMsg["from"] = myId;
+        pongMsg["to"] = sourceNode;
+        pongMsg["seq"] = seq;
+        
+        String out;
+        serializeJson(pongMsg, out);
+        mesh.sendBroadcast(out);
+        
+        Serial.printf("[PING] Recibido de %u seq=%u -> PONG enviado\n", sourceNode, seq);
+      }
+      return;
+    }
+    
+    // PONG: Si tengo un ping pendiente, reportar RTT al gateway
+    if (msgType == "PONG" && nodePing.active) {
+      uint32_t targetNode = doc["from"].as<uint32_t>();
+      uint32_t seq = doc["seq"].as<uint32_t>();
+      
+      if (targetNode == nodePing.targetNode && seq == nodePing.seq) {
+        unsigned long rtt = millis() - nodePing.sentTime;
+        
+        // Enviar resultado al gateway
+        StaticJsonDocument<128> reportMsg;
+        reportMsg["type"] = "PONG";
+        reportMsg["from"] = myId;
+        reportMsg["to"] = targetNode;
+        reportMsg["seq"] = seq;
+        reportMsg["rtt"] = rtt;
+        
+        String out;
+        serializeJson(reportMsg, out);
+        mesh.sendBroadcast(out);
+        
+        Serial.printf("[PONG] Recibido de %u RTT=%lums (seq=%u)\n", targetNode, rtt, seq);
+        nodePing.active = false;
+      }
+      return;
     }
   }
   
-  // Mensaje normal (datos de sensor u otro tipo)
+  // Mensaje normal (datos de sensor)
   Serial.printf("[INFO] Mensaje no de control: %s\n", msg.c_str());
 }
 
@@ -179,4 +194,10 @@ void loop() {
   
   mesh.update();
   userScheduler.execute();
+  
+  // Monitorear timeout de ping (5 segundos)
+  if (nodePing.active && (millis() - nodePing.sentTime > 5000)) {
+    Serial.printf("[PING] TIMEOUT: No se recibió PONG de nodo %u\n", nodePing.targetNode);
+    nodePing.active = false;
+  }
 }

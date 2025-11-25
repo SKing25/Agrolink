@@ -7,7 +7,8 @@ BROKER = "localhost"
 PORT = 1883
 TOPIC = "dht22/datos/+" 
 
-SERVER_URL = "http://localhost:5000/datos"
+# https://agrolink.app/datos
+SERVER_URL = "https://agrolink.app/datos"
 
 node_cache = {}
 
