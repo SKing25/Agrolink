@@ -155,6 +155,47 @@ struct PendingPing {
 
 PendingPing pendingPing = {0, 0, 0, false};
 
+// Información de nodos
+struct NodeInfo {
+  uint32_t nodeId;
+  String nodeType;
+  String sensors;
+  unsigned long lastSeen;
+};
+
+NodeInfo nodeInfoMap[20];
+int nodeInfoCount = 0;
+
+void updateNodeInfo(uint32_t nodeId, const String& type, const String& sensors) {
+  // Buscar si ya existe
+  for (int i = 0; i < nodeInfoCount; i++) {
+    if (nodeInfoMap[i].nodeId == nodeId) {
+      nodeInfoMap[i].nodeType = type;
+      nodeInfoMap[i].sensors = sensors;
+      nodeInfoMap[i].lastSeen = millis();
+      return;
+    }
+  }
+  
+  // Agregar nuevo
+  if (nodeInfoCount < 20) {
+    nodeInfoMap[nodeInfoCount].nodeId = nodeId;
+    nodeInfoMap[nodeInfoCount].nodeType = type;
+    nodeInfoMap[nodeInfoCount].sensors = sensors;
+    nodeInfoMap[nodeInfoCount].lastSeen = millis();
+    nodeInfoCount++;
+  }
+}
+
+String getNodeInfo(uint32_t nodeId) {
+  for (int i = 0; i < nodeInfoCount; i++) {
+    if (nodeInfoMap[i].nodeId == nodeId) {
+      return nodeInfoMap[i].nodeType + " (" + nodeInfoMap[i].sensors + ")";
+    }
+  }
+  return "Desconocido";
+}
+
 // ============================================
 // COMANDOS TELNET
 // ============================================
@@ -176,10 +217,20 @@ void cmdNodes(TelnetShell* sh, const String& args) {
   auto nodes = mesh.getNodeList();
   sh->println("\r\n=== NODOS EN EL MESH ===");
   sh->println("Total: %d nodos", nodes.size());
-  for (auto node : nodes) {
-    sh->println("  - %u", node);
+  
+  if (args == "refresh") {
+    // Solicitar información actualizada a todos los nodos
+    String msg = "{\"type\":\"INFO_REQ\"}";
+    mesh.sendBroadcast(msg);
+    sh->println("Solicitando información a los nodos...\n");
+    return;
   }
-  sh->println("");
+  
+  for (auto node : nodes) {
+    String info = getNodeInfo(node);
+    sh->println("  - %u: %s", node, info.c_str());
+  }
+  sh->println("\nUsa 'nodes refresh' para actualizar información");
 }
 
 void cmdLed(TelnetShell* sh, const String& args) {
@@ -324,6 +375,15 @@ void receivedCallback(uint32_t from, String &msg) {
         
         pendingPing.active = false;
       }
+      return;
+    }
+    
+    // INFO: Respuesta con información del nodo
+    if (msgType == "INFO") {
+      String nodeType = doc["node_type"].as<String>();
+      String sensors = doc["sensors"].as<String>();
+      updateNodeInfo(from, nodeType, sensors);
+      Serial.printf("[INFO] Nodo %u: %s (%s)\n", from, nodeType.c_str(), sensors.c_str());
       return;
     }
   }

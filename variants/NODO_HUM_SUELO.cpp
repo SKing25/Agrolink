@@ -151,6 +151,21 @@ void receivedCallback(uint32_t from, String &msg) {
       }
       return;
     }
+    
+    // INFO_REQ: Gateway solicita información del nodo
+    if (msgType == "INFO_REQ") {
+      StaticJsonDocument<128> infoMsg;
+      infoMsg["type"] = "INFO";
+      infoMsg["node_type"] = "Nodo Hum. Suelo";
+      infoMsg["sensors"] = "SEN0193 + GPS";
+      
+      String out;
+      serializeJson(infoMsg, out);
+      mesh.sendBroadcast(out);
+      
+      Serial.println("[INFO_REQ] Enviando información al gateway");
+      return;
+    }
   }
   
   // Mensaje normal (datos de sensor)
