@@ -1,5 +1,6 @@
 #include <painlessMesh.h>
 #include <ArduinoJson.h>
+#include <WiFi.h>
 #include <TinyGPS++.h>
 
 #define MESH_PREFIX "Mesh"
@@ -193,6 +194,8 @@ void setup() {
     
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+  WiFi.setSleep(false);
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
   
   Serial.printf("NODE ID: %u\n", mesh.getNodeId());
   

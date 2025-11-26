@@ -3,6 +3,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 #define MESH_PREFIX "Mesh"
 #define MESH_PASSWORD "12345678"
@@ -196,6 +197,21 @@ String getNodeInfo(uint32_t nodeId) {
   return "Desconocido";
 }
 
+bool parseNodeId(const String& token, uint32_t &nodeId) {
+  String trimmed = token;
+  trimmed.trim();
+  const char* cstr = trimmed.c_str();
+  char* endPtr = nullptr;
+  unsigned long parsed = strtoul(cstr, &endPtr, 10);
+
+  if (cstr == endPtr || (endPtr && *endPtr != '\0') || parsed == 0) {
+    return false;
+  }
+
+  nodeId = static_cast<uint32_t>(parsed);
+  return true;
+}
+
 // ============================================
 // COMANDOS TELNET
 // ============================================
@@ -303,8 +319,8 @@ void cmdPing(TelnetShell* sh, const String& args) {
   
   // Caso 1: Solo un argumento - Gateway hace ping al nodo
   if (spacePos < 0) {
-    uint32_t targetNode = args.toInt();
-    if (targetNode == 0) {
+    uint32_t targetNode = 0;
+    if (!parseNodeId(args, targetNode)) {
       sh->println("Error: ID de nodo inválido");
       return;
     }
@@ -333,10 +349,10 @@ void cmdPing(TelnetShell* sh, const String& args) {
   String sourceStr = args.substring(0, spacePos);
   String targetStr = args.substring(spacePos + 1);
   
-  uint32_t sourceNode = sourceStr.toInt();
-  uint32_t targetNode = targetStr.toInt();
+  uint32_t sourceNode = 0;
+  uint32_t targetNode = 0;
   
-  if (sourceNode == 0 || targetNode == 0) {
+  if (!parseNodeId(sourceStr, sourceNode) || !parseNodeId(targetStr, targetNode)) {
     sh->println("Error: IDs de nodo inválidos");
     return;
   }
@@ -444,6 +460,8 @@ void setup() {
 
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+  WiFi.setSleep(false);
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
   Serial.printf("NODE ID: %u\n", mesh.getNodeId());
   
@@ -531,7 +549,7 @@ void loop() {
   unsigned long now = millis();
   
   // Timeout para PING (5 segundos)
-  if (pendingPing.active && (now - pendingPing.sentTime > 5000)) {
+  if (pendingPing.active && (now - pendingPing.sentTime > 20000)) {
     shell.println("TIMEOUT: No se recibió PONG");
     pendingPing.active = false;
   }

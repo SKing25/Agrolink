@@ -1,5 +1,4 @@
 #include <painlessMesh.h>
-#include <TinyGPS++.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
 
@@ -7,49 +6,8 @@
 #define MESH_PASSWORD "12345678"
 #define MESH_PORT 5555
 
-#define TEMT6000_PIN 34
-#define GPS_BAUDRATE 9600
-
 Scheduler userScheduler;
 painlessMesh mesh;
-TinyGPSPlus gps;
-HardwareSerial gpsSerial(2);  // Serial2 para GPS
-
-Task taskSendData(TASK_SECOND * 10, TASK_FOREVER, []() {
-  // Leer sensor de luz
-  int rawValue = analogRead(TEMT6000_PIN);
-  
-  // Convertir a voltaje (ESP32: 0-4095 = 0-3.3V)
-  float voltage = (rawValue / 4095.0) * 3.3;
-  
-  // Convertir a lux aproximado (TEMT6000: 10mV por lux típicamente)
-  float lux = voltage * 100;  // 1V = 100 lux aproximadamente
-  
-  // Calcular porcentaje (0-100%)
-  float percentage = (rawValue / 4095.0) * 100;
-
-  // Construir JSON con luz + GPS
-  String msg = "{\"light\":" + String(lux, 2) + 
-               ",\"percentage\":" + String(percentage, 1);
-  
-  // Agregar coordenadas GPS
-  if (gps.location.isValid()) {
-    msg += ",\"lat\":" + String(gps.location.lat(), 6);
-    msg += ",\"lon\":" + String(gps.location.lng(), 6);
-    Serial.printf("GPS OK - Sat: %d\n", gps.satellites.value());
-  } else {
-    msg += ",\"lat\":\"no data\"";
-    msg += ",\"lon\":\"no data\"";
-    Serial.printf("GPS sin fix - Sat: %d, Chars: %d\n", 
-                  gps.satellites.value(), gps.charsProcessed());
-  }
-  
-  msg += "}";
-  
-  mesh.sendBroadcast(msg);
-  Serial.println("Enviado: " + msg);
-  Serial.printf("Nodos conectados: %d\n", mesh.getNodeList());
-});
 
 // Variables para manejar ping entre nodos
 struct PendingPing {
@@ -157,8 +115,8 @@ void receivedCallback(uint32_t from, String &msg) {
     if (msgType == "INFO_REQ") {
       StaticJsonDocument<128> infoMsg;
       infoMsg["type"] = "INFO";
-      infoMsg["node_type"] = "Nodo Luz";
-      infoMsg["sensors"] = "TEMT6000 + GPS";
+      infoMsg["node_type"] = "Nodo Repetidor";
+      infoMsg["sensors"] = "Ninguno";
       
       String out;
       serializeJson(infoMsg, out);
@@ -169,8 +127,8 @@ void receivedCallback(uint32_t from, String &msg) {
     }
   }
   
-  // Mensaje normal (datos de sensor)
-  Serial.printf("[INFO] Mensaje no de control: %s\n", msg.c_str());
+  // Mensaje normal (ignorar, este nodo no procesa datos de sensores)
+  Serial.printf("[INFO] Mensaje no procesado: %s\n", msg.c_str());
 }
 
 void newConnectionCallback(uint32_t nodeId) {
@@ -184,11 +142,8 @@ void changedConnectionCallback() {
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  Serial.println("\n=== INICIANDO NODO LUZ (TEMT6000) ===");
+  Serial.println("\n=== INICIANDO NODO REPETIDOR ===");
   
-  pinMode(TEMT6000_PIN, INPUT);
-  analogSetAttenuation(ADC_11db);  // Rango completo 0-3.3V
-    
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
   WiFi.setSleep(false);
@@ -199,21 +154,12 @@ void setup() {
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);
-
-  userScheduler.addTask(taskSendData);
-  taskSendData.enable();
   
-  Serial.println("Mesh configurado - Enviando datos cada 10s");
+  Serial.println("Nodo repetidor configurado - Sin sensores, solo diagnóstico mesh");
 }
 
 void loop() {
-  // Leer datos del GPS continuamente
-  while (gpsSerial.available() > 0) {
-    gps.encode(gpsSerial.read());
-  }
-  
   mesh.update();
-  userScheduler.execute();
   
   // Monitorear timeout de ping (5 segundos)
   if (nodePing.active && (millis() - nodePing.sentTime > 5000)) {
